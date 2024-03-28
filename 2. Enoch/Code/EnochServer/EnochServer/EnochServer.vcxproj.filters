@@ -1,0 +1,134 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="소스 파일\NetWork">
+      <UniqueIdentifier>{e63b85fa-2dac-465b-87a8-2cf1c82688e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Log">
+      <UniqueIdentifier>{642d7595-8d1f-447d-ba4f-b1d49fe877a5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Monitor">
+      <UniqueIdentifier>{2de6ad89-18e5-47ed-b1a8-98f6e3baf226}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\NetWork\Packet">
+      <UniqueIdentifier>{a03fe427-61d7-4bc6-8d4a-69273b005e1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Contents">
+      <UniqueIdentifier>{83c8598b-a1da-4b30-95fe-9908b2e87d2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Config">
+      <UniqueIdentifier>{4af31615-23ee-4a75-80be-3707a4df2c8c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\NetWork\Session">
+      <UniqueIdentifier>{9d360fcb-41dc-458d-a05a-3b1d39fb9652}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\NetWork\Server">
+      <UniqueIdentifier>{edd3dd83-6c9a-4ba0-aae8-8eff6200dcdc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\DB">
+      <UniqueIdentifier>{789975e8-5406-4f21-b48b-6a0af65a2d27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\DB\mapper">
+      <UniqueIdentifier>{0858c2e9-5713-4ba1-823f-57f51c26d2d0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Packet.cpp">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="PacketProc.cpp">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="Ringbuffer.cpp">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="Player.cpp">
+      <Filter>소스 파일\Contents</Filter>
+    </ClCompile>
+    <ClCompile Include="Session.cpp">
+      <Filter>소스 파일\NetWork\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="ProtoSessionManager.cpp">
+      <Filter>소스 파일\NetWork\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="Server.cpp">
+      <Filter>소스 파일\NetWork\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="LogUtil.cpp">
+      <Filter>소스 파일\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="ConfigParser.cpp">
+      <Filter>소스 파일\Config</Filter>
+    </ClCompile>
+    <ClCompile Include="Config.cpp">
+      <Filter>소스 파일\Config</Filter>
+    </ClCompile>
+    <ClCompile Include="DBConnect.cpp">
+      <Filter>소스 파일\DB</Filter>
+    </ClCompile>
+    <ClCompile Include="TestMapper.cpp">
+      <Filter>소스 파일\DB\mapper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="define.h">
+      <Filter>소스 파일\Config</Filter>
+    </ClInclude>
+    <ClInclude Include="MessageType.h">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="Packet.h">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketProc.h">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="Ringbuffer.h">
+      <Filter>소스 파일\NetWork\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>소스 파일\Contents</Filter>
+    </ClInclude>
+    <ClInclude Include="EnochServer.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Session.h">
+      <Filter>소스 파일\NetWork\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="AbstractSessionManager.h">
+      <Filter>소스 파일\NetWork\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="ProtoSessionManager.h">
+      <Filter>소스 파일\NetWork\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="Server.h">
+      <Filter>소스 파일\NetWork\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="LogUtil.h">
+      <Filter>소스 파일\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigParser.h">
+      <Filter>소스 파일\Config</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>소스 파일\Config</Filter>
+    </ClInclude>
+    <ClInclude Include="DBConnect.h">
+      <Filter>소스 파일\DB</Filter>
+    </ClInclude>
+    <ClInclude Include="TestMapper.h">
+      <Filter>소스 파일\DB\mapper</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

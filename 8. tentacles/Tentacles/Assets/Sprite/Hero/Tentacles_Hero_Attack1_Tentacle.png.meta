@@ -1,0 +1,304 @@
+fileFormatVersion: 2
+guid: 401814bc374029245bdcbd0f9ad9fc1c
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -6898424404403963756
+    second: Tentacles_Hero_Attack1_Tentacle_0
+  - first:
+      213: -9095735227772593939
+    second: Tentacles_Hero_Attack1_Tentacle_1
+  - first:
+      213: 4593530627104968375
+    second: Tentacles_Hero_Attack1_Tentacle_2_1
+  - first:
+      213: -4473475559186789236
+    second: Tentacles_Hero_Attack1_Tentacle_2_2
+  - first:
+      213: 2318689643062045724
+    second: Tentacles_Hero_Attack1_Tentacle_3
+  - first:
+      213: 2234631056784445198
+    second: Tentacles_Hero_Attack1_Tentacle_4
+  - first:
+      213: -4817411641729776831
+    second: Tentacles_Hero_Attack1_Tentacle_5_1
+  - first:
+      213: -8669819711742872654
+    second: Tentacles_Hero_Attack1_Tentacle_5_2
+  externalObjects: {}
+  serializedVersion: 10
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: -1
+    aniso: -1
+    mipBias: -100
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 400
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  platformSettings:
+  - serializedVersion: 2
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+  - serializedVersion: 2
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+  - serializedVersion: 2
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 640
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 35ed3a20122c54f43af33e1b5d61951c
+      internalID: -6898424404403963756
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_1
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 640
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 570de7c40eb218a4a9988703a004f527
+      internalID: -9095735227772593939
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_2_1
+      rect:
+        serializedVersion: 2
+        x: 1536
+        y: 640
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 674938e4cb66ba64583fee86237af4d2
+      internalID: 4593530627104968375
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_2_2
+      rect:
+        serializedVersion: 2
+        x: 2304
+        y: 640
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fbef5ecf3bd8ce04e970527a8c8bc328
+      internalID: -4473475559186789236
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_3
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 2
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c9432018b84fadb40acacd0e5e7816f7
+      internalID: 2318689643062045724
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_4
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 0
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: acd6b97ca904cdf45ac2826d55ceab31
+      internalID: 2234631056784445198
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_5_1
+      rect:
+        serializedVersion: 2
+        x: 1536
+        y: 2
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3b30ab43e5b4a1248bb0a9cd4cacfb01
+      internalID: -4817411641729776831
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tentacles_Hero_Attack1_Tentacle_5_2
+      rect:
+        serializedVersion: 2
+        x: 2304
+        y: 2
+        width: 768
+        height: 640
+      alignment: 9
+      pivot: {x: 0.3125, y: 0.65}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e9a537929cdf639408f08bf76c52f977
+      internalID: -8669819711742872654
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 1534d4cf9e6ce0f4bac3f56df36abf30
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+  spritePackingTag: 
+  pSDRemoveMatte: 0
+  pSDShowRemoveMatteOption: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

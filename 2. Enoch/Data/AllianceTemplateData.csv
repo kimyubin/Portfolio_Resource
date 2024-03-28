@@ -1,0 +1,34 @@
+﻿ID,이름,Skill,인원,범위
+1,방어력 동맹,20000,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+2,공격력 동맹,20001,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+3,체력 동맹,20002,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+4,체젠 동맹,20003,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+5,공속 동맹,20004,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+6,마젠 동맹,20005,2,Alliance
+,,,4,Alliance
+,,,6,AllyAll
+7,방깎 동맹,20006,2,EnemyAll
+,,,4,EnemyAll
+,,,6,EnemyAll
+8,공깎 동맹,20007,2,EnemyAll
+,,,4,EnemyAll
+,,,6,EnemyAll
+9,체젠깎 동맹,20008,2,EnemyAll
+,,,4,EnemyAll
+,,,6,EnemyAll
+10,공속깎 동맹,20009,2,EnemyAll
+,,,4,EnemyAll
+,,,6,EnemyAll
+11,마젠깎 동맹,20010,2,EnemyAll
+,,,4,EnemyAll
+,,,6,EnemyAll

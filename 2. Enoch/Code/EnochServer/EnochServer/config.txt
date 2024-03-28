@@ -1,0 +1,9 @@
+port = 6000  //서버 포트번호
+
+threadCnt = 6  //서버 쓰레드 갯수
+runningCnt = 3 // 서버 최대 활성 쓰레드
+dbServer = 127.0.0.1
+dbPort = 3306
+dbUser = root
+dbPassword = mypwd //MySql 비번
+dbSchema = ENOCH

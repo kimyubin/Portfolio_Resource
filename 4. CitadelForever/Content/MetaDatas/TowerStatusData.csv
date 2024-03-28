@@ -1,0 +1,2 @@
+Name,BuildingType,BuildingName,BasicMaxHP,AttackPower,AttackRange,AttackSpeed,Defense
+1,Default,Default,1000,10,100,10,10
