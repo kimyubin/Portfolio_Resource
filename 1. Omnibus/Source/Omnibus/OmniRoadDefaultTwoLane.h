@@ -50,7 +50,8 @@ public:
 	/////////////////////////////////////////////////////////////////////
 
 	virtual USplineComponent* GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
-	
+	virtual USplineComponent* GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
+
 	UFUNCTION()
 	USplineComponent* GetMainRoadSpline() const;
 

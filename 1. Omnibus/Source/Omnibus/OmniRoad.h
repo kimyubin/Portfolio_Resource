@@ -64,6 +64,7 @@ public:
 	 * @return 다음 차선 lane
 	 */
 	virtual USplineComponent*   GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad);
+	virtual USplineComponent*   GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad);
 	
 	USplineComponent*           GetRoadSpline(const uint32 InIdx) const;
 	USplineComponent*           GetLaneSpline(const uint32 InIdx) const;
@@ -99,6 +100,16 @@ public:
 	/** 테스트용. 임시. 이웃한 임의의 도로를 반환 */
 	AOmniRoad* GetRandomConnectedRoad(AOmniRoad* PrevRoad);
 
+	/**
+	 * 다음 도로와 다음 도로로 가는 차선을 반환.
+	 * @param InPrevRoad     직전 도로(진입한 도로)
+	 * @param OutCurrentLane 현재 도로에서 사용해야하는 차선(다음 도로와 연결됨)
+	 * @param OutNextRoad    다음 도로 (현재 차선을 타고 진출할 도로) 
+	 */
+	void GetLaneAndNextLane(AOmniRoad* InPrevRoad, USplineComponent*& OutCurrentLane, AOmniRoad*& OutNextRoad);
+
+	AOmniRoad* GetConnectedRoad(const uint32 ConnectedRoadIdx) const { return ConnectedRoadsArray[ConnectedRoadIdx]; }
+	
 	uint8 GetLaneSplineNum() const { return LaneSplineNum; };
 	
 protected:

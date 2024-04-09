@@ -279,6 +279,23 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetNextSplinePath(const int32 InLaneA
 	return nullptr;
 }
 
+USplineComponent* AOmniRoadDefaultTwoLane::GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+{
+	if (OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
+	{
+		// 2차선은 접근 위치 번호와 진행방향이 반대
+		const int NextvRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
+		
+		if (NextvRoadIdx != INDEX_NONE)
+		{
+			return GetLaneSpline(NextvRoadIdx);
+		}
+	}
+
+	return nullptr;
+}
+
+
 
 USplineComponent* AOmniRoadDefaultTwoLane::GetMainRoadSpline() const
 {

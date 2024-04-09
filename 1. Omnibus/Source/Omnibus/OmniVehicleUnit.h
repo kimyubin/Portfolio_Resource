@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "OmniPawn.h"
 #include "GameFramework/Pawn.h"
-#include "OmniVehicleBus.generated.h"
+#include "OmniVehicleUnit.generated.h"
 
 class AOmniLineBusRoute;
 class UTextRenderComponent;
@@ -16,12 +16,12 @@ class AOmniRoad;
 
 /** 버스 유닛 최상위 클래스 */
 UCLASS()
-class OMNIBUS_API AOmniVehicleBus : public AOmniPawn
+class OMNIBUS_API AOmniVehicleUnit : public AOmniPawn
 {
 	GENERATED_BODY()
 
 public:
-	AOmniVehicleBus();
+	AOmniVehicleUnit();
 
 protected:
 	virtual void BeginPlay() override;
@@ -30,25 +30,28 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	
+	void DriveToDestination();
 
-	void SetupSpawnInit(AOmniLineBusRoute* InOuterRoute);
-
-protected:
-	void DriveToDestination(const float DeltaTime);
-
-	/** 노선 스플라인의 현재 목표 가져오기*/
+	/** 목표 OmniRoad로 가기 위한 회전 가져오기*/
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	FVector GetTargetPointFromRouteSpline(const float DeltaTime);
+	FRotator GetRotationFromOmniRoadSpline();
 
-	/** 노선 스플라인의 현재 목표를 바라보는 회전 가져오기*/
-	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	FRotator GetRotationToTarget(const FVector InTargetPos);
+	UFUNCTION(BlueprintCallable)
+	void BeginOverlapSensor(UPrimitiveComponent* OverlappedComp
+	                      , AActor*              OtherActor
+	                      , UPrimitiveComponent* OtherComp
+	                      , int32                OtherBodyIndex
+	                      , bool                 bFromSweep
+	                      , const FHitResult&    SweepResult);
 
-	/** 추적 대상 따라가는 속도*/
-	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	void SetBusSpeed(const FVector InTargetPos);
+	AOmniRoad*        GetNearestOmniRoad() const;
+	USplineComponent* GetTargetLane();
+	AOmniRoad*        GetNextRouteRoad();
 
-public:
+	/** 버스 루트 생성. 현재 랜덤으로 생성함. */
+	void              GenerateRouteRoad();
+
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
 	void SetDriveMaxSpeed(const double InMaxSpeed = 1200.0);
 
@@ -57,6 +60,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
 	void SetDriveDeceleration(const double InDeceleration = 12000.0);
+
+	/** !사용하지 않음. 목표까지 내비게이션으로 주행 */
+	UFUNCTION(BlueprintCallable, Category = "Bus")
+	void MoveToTarget(const AActor* DestActor);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	USpectatorPawnMovement* PawnMovement;
@@ -79,14 +86,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	double SteeringDistance;
 
-	/** 노선 위에서 움직이는 추적 대상의 이동 속도 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	double RouteTargetMoveSpeed;
+	TWeakObjectPtr<USplineComponent> CurrentLane;
+
+	/** 현재 BusRouteRoads index.*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	int CurrentRouteRoadIdx;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TWeakObjectPtr<AOmniLineBusRoute> MyBusRoute;
-
-	/** 현재 추적하고 있는 노선 Spline의 거리(distance). beginPlay에서 가장 가까운 inputkey로 초기화됨. */
-	float CurrentRouteDistance;
-
+	TArray<TWeakObjectPtr<AOmniRoad>> BusRouteRoads;
 };

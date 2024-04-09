@@ -22,6 +22,16 @@
 #define OB_IS_VALID(UObjPtr) IsOmniValidLog(UObjPtr, GET_VAR_NAME(UObjPtr), OB_LOG_FUNC_LINE_INFO, this->GetName())
 
 /**
+ * TWeakObjectPtr 객체 유효성 테스트 및 로그 출력
+ * 로그가 필요한 경우에만 사용해야함.
+ * nullptr, bEvenIfPendingKill == true 등 유효하지 않을 경우, 로그 출력 및 false 반환.
+ * @param WeakObjectPtr : 테스트할 TWeakObjectPtr 객체
+ * @return 객체가 사용가능하면 true 반환. null, pending kill, 가비지 수집 대상인 경우 false 반환.
+ * @see IsOmniValidLog
+ */
+#define OB_IS_WEAK_PTR_VALID(WeakObjectPtr) IsOmniTWeakObjectValidLog(WeakObjectPtr, GET_VAR_NAME(WeakObjectPtr), OB_LOG_FUNC_LINE_INFO, this->GetName())
+
+/**
  * 개체 유효성 테스트 및 로그 출력
  * @param    Test           테스트할 개체
  * @param    InVarName      테스트할 개체의 변수명
@@ -36,6 +46,25 @@ FORCEINLINE bool IsOmniValidLog(const UObject* Test, const FString& InVarName, c
 		return true;
 
 	UE_LOG(Omnibus, Warning, TEXT("%s %s is not valid. (%s)"), *InLogFuncInfo, *InVarName, *OwnerObjName)
+	
+	return false;
+}
+
+/**
+ * TWeakObjectPtr 객체 유효성 테스트 및 로그 출력
+ * @param    Test           테스트할 TWeakObjectPtr 객체
+ * @param    InVarName      테스트할 객체의 변수명
+ * @param    InLogFuncInfo  오류가 난 함수 위치 정보.
+ * @param    OwnerObjName   오류가 난 개체의 이름.
+ * @return   객체가 사용가능하면 true 반환. null, pending kill, 가비지 수집 대상이 아닌 경우.
+ * @see OB_IS_VALID
+ */
+FORCEINLINE bool IsOmniTWeakObjectValidLog(const TWeakObjectPtr<UObject> Test, const FString& InVarName, const FString& InLogFuncInfo, const FString& OwnerObjName)
+{
+	if (Test.IsValid())
+		return true;
+
+	UE_LOG(Omnibus, Warning, TEXT("TWeakObjectPtr error %s %s is not valid. (%s)"), *InLogFuncInfo, *InVarName, *OwnerObjName)
 	
 	return false;
 }
@@ -172,7 +201,8 @@ namespace OmniMath
 	 * @return 범위[0, Max] 내 순환한 값
 	 */
 	uint32 CircularNum(const uint32 InMax, const int64 InNum);
-	
+	double CircularNumF(const double InMax, const double InNum);
+
 	/**
 	 * offset 만큼 떨어진 곳에 있는 대상의 절대 Transform 계산
 	 * @param InPos : 자신의 위치
@@ -271,13 +301,22 @@ namespace OmniMath
 /**
  * 테스트용 3D 텍스트 Render
  * ATextRenderActor를 정해진 시간동안만 월드에 스폰시킴.
+ * WorldSize는 50 전후부터 보임
  */
+#if WITH_EDITOR
+
 #define TIME_LIMIT_TEXT_RENDER( SpawnPos, LifeSpan, SettingText, WorldSize )\
 {\
-	auto textRender = GetWorld()->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), SpawnPos,FRotator(90.0,0.0,0.0));\
+	auto textRender = GetWorld()->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), SpawnPos, FRotator(90.0,0.0,0.0));\
 	textRender->SetLifeSpan(LifeSpan);\
 	textRender->GetTextRender()->SetText(SettingText);\
 	textRender->GetTextRender()->SetWorldSize(WorldSize);\
 	textRender->GetTextRender()->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);\
 	textRender->GetTextRender()->SetTextRenderColor(FColor::Red);\
 }
+
+#else
+
+#define TIME_LIMIT_TEXT_RENDER( SpawnPos, LifeSpan, SettingText, WorldSize )
+
+#endif

@@ -3,11 +3,13 @@
 #include "OmnibusPlayData.h"
 
 #include "OmnibusUtilities.h"
+#include "OmniVehicleBus.h"
 
 UOmnibusPlayData::UOmnibusPlayData()
 {
-	CurrentLocation = FVector3d();
-	PlayMode        = EOmniPlayMode::Move;
+	CurrentLocation     = FVector3d();
+	PlayMode            = EOmniPlayMode::Move;
+	OmniVehicleBusClass = AOmniVehicleBus::StaticClass();
 }
 
 UStaticMesh* UOmnibusPlayData::GetPlainRoadMesh(const int& InMeshIdx) const

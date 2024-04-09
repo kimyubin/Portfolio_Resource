@@ -38,7 +38,7 @@ public:
 	void SetLanePoints();
 
 	/** 진입 위치에서 진행방향에 맞는 차선 반환 */
-	USplineComponent* GetLaneByApproachIdx(const uint32 ApproachIdx, const int& LaneDirection) const;
+	USplineComponent* GetLaneByApproachIdx(const uint32 ApproachIdx, const uint8 LaneDirection) const;
 	/** 진입 위치에서 진행방향에 맞는 차선 반환 */
 	USplineComponent* GetLaneByApproachIdx(const uint32 ApproachIdx, const ERoadDirection& LaneDirection) const;
 	/** 진입 위치에서 진행방향에 맞는 차선 반환 */
@@ -53,11 +53,16 @@ public:
 	FIntersectionDimensionInfo GetIntersectionDimensionInfo();
 
 	virtual USplineComponent* GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
+	virtual USplineComponent* GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
 
 	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx) override;
 
 private:
 	ERoadDirection GetLaneDirectionByConnectedIdx(const uint32 StartLaneApproachIdx, const uint32 TargetRoadIdx) const;
+
+	uint32 ConvertDetectorIdxToConnectRoadIdx(const uint32 InDetectorIdx);
+	uint32 ConvertConnectRoadIdxToDetectorIdx(const uint32 InConnectRoadIdx);
+	
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

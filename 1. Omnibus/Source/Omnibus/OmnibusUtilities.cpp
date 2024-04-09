@@ -97,6 +97,16 @@ uint32 OmniMath::CircularNum(const uint32 InMax, const int64 InNum)
 	return InNum % (InMax + 1);
 }
 
+double OmniMath::CircularNumF(const double InMax, const double InNum)
+{
+	// InMax를 범위에 포함하기 위해 1 더함.
+	const double MaxOutLine = InMax + static_cast<double>(1);
+	if (InNum < 0)
+		return fmod(InNum, MaxOutLine) + MaxOutLine;
+		
+	return fmod(InNum, MaxOutLine);
+}
+
 FTransform OmniMath::GetTransformAddOffset(const FVector& InPos, const FVector& InDirection, const double InOffset)
 {
 	const FVector ResVector = InPos + InDirection * InOffset;

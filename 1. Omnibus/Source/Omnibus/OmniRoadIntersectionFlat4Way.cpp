@@ -204,7 +204,7 @@ void AOmniRoadIntersectionFlat4Way::SetLanePoints()
 				};
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const uint32 ApproachIdx, const int& LaneDirection) const
+USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const uint32 ApproachIdx, const uint8 LaneDirection) const
 {
 	const uint32 LaneMaxIdx = LaneSplineNum / 4; // 12/4 = 3, 0~3
 	const uint32 LandIdx    = OmniMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
@@ -265,6 +265,23 @@ USplineComponent* AOmniRoadIntersectionFlat4Way::GetNextSplinePath(const int32 I
 	return nullptr;
 }
 
+USplineComponent* AOmniRoadIntersectionFlat4Way::GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+{
+	if (OB_IS_VALID(InNextTargetRoad))
+	{
+		const int PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
+		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
+		if (PrevRoadIdx != INDEX_NONE && NextRoadIdx != INDEX_NONE)
+		{
+			const ERoadDirection Direction = (GetLaneDirectionByConnectedIdx(PrevRoadIdx, NextRoadIdx));
+			return GetLaneByApproachIdx(PrevRoadIdx, Direction);
+		}
+	}
+
+	return nullptr;
+}
+
+
 void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx)
 {
 	if (OB_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
@@ -319,3 +336,44 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	return Direction;
 }
 
+uint32 AOmniRoadIntersectionFlat4Way::ConvertDetectorIdxToConnectRoadIdx(const uint32 InDetectorIdx)
+{
+    /**
+     * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
+     * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
+     *      0            0
+     *   2     3  =>  3     1
+     *      1            2
+     */
+	uint32 ResConnectRoadIdx = InDetectorIdx;
+	switch (InDetectorIdx)
+	{
+		case 0: ResConnectRoadIdx = 0; break;
+		case 3: ResConnectRoadIdx = 1; break;
+		case 1: ResConnectRoadIdx = 2; break;
+		case 2: ResConnectRoadIdx = 3; break;
+		default: break;
+	}
+	return ResConnectRoadIdx;
+}
+
+uint32 AOmniRoadIntersectionFlat4Way::ConvertConnectRoadIdxToDetectorIdx(const uint32 InConnectRoadIdx)
+{
+	/**
+	 * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
+	 * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
+	 *      0            0
+	 *   2     3  <=  3     1
+	 *      1            2
+	 */
+	uint32 ResConnectRoadIdx = InConnectRoadIdx;
+	switch (InConnectRoadIdx)
+	{
+		case 0: ResConnectRoadIdx = 0; break;
+		case 1: ResConnectRoadIdx = 3; break;
+		case 2: ResConnectRoadIdx = 1; break;
+		case 3: ResConnectRoadIdx = 2; break;
+		default: break;
+	}
+	return ResConnectRoadIdx;
+}
