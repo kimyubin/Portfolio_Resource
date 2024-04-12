@@ -54,7 +54,7 @@ void UOmniLaneApproachCollision::InitLaneApproach(AOmniRoad* InOwnerOmniRoad, co
 USplineComponent* UOmniLaneApproachCollision::GetNextSplineByRoad(AOmniRoad* InNextTargetRoad) const
 {
 	if (OwnerOmniRoad.IsValid() == true)
-		return OwnerOmniRoad->GetNextSplinePath(LaneApproachIdx, InNextTargetRoad);
+		return OwnerOmniRoad->GetSplineToNextRoad(LaneApproachIdx, InNextTargetRoad);
 
 	return nullptr;
 }

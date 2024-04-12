@@ -79,10 +79,10 @@ void UOmniDetectSphereComponent::SetRelativeTransformToSpline()
 	if (OwnerSpline.IsValid() == false)
 		return;
 
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
-	SetRelativeLocation(OwnerSpline->GetLocationAtSplinePoint(GetSplinePointIdx(), SplineCoord_Local));
-	SetRelativeRotation(OwnerSpline->GetDirectionAtSplinePoint(GetSplinePointIdx(), SplineCoord_Local).Rotation());
+	SetRelativeLocation(OwnerSpline->GetLocationAtSplinePoint(GetSplinePointIdx(), CoordSpace));
+	SetRelativeRotation(OwnerSpline->GetDirectionAtSplinePoint(GetSplinePointIdx(), CoordSpace).Rotation());
 }
 
 FVector UOmniDetectSphereComponent::GetSplinePointInsideTangent()

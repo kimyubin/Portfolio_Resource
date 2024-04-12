@@ -176,7 +176,7 @@ void AOmniRoad::InitLaneApproachBox(const uint32 InIdx, USplineComponent* InOwne
 	CurDebugLaneArrow->SetupAttachment(InOwnerLaneSpline);
 }
 
-USplineComponent* AOmniRoad::GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
+USplineComponent* AOmniRoad::GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
 {
 	OB_LOG("omniRoad에서 로드됨")
 	if (OB_IS_VALID(InNextTargetRoad))
@@ -191,7 +191,7 @@ USplineComponent* AOmniRoad::GetNextSplinePath(const int32 InLaneApproachIdx, AO
 	return nullptr;
 }
 
-USplineComponent* AOmniRoad::GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+USplineComponent* AOmniRoad::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	OB_LOG("omniRoad에서 로드됨")
 	if (OB_IS_VALID(InNextTargetRoad))
@@ -383,11 +383,10 @@ AOmniRoad* AOmniRoad::GetRandomConnectedRoad(AOmniRoad* PrevRoad)
 	return ConnectedRoadsArray[RdIdx];
 }
 
-void AOmniRoad::GetLaneAndNextLane(AOmniRoad* InPrevRoad, USplineComponent*& OutCurrentLane, AOmniRoad*& OutNextRoad)
+AOmniRoad* AOmniRoad::GetRandomNextRoad(AOmniRoad* InPrevRoad)
 {
 	const int32 PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
 
-	//1. 다음 도로 찾기
 	std::random_device deviceSeed;
 	std::mt19937 rdEngine(deviceSeed());
 	std::uniform_int_distribution<int> rdRange(0, ConnectedRoadsArray.Num() - 1);
@@ -400,13 +399,8 @@ void AOmniRoad::GetLaneAndNextLane(AOmniRoad* InPrevRoad, USplineComponent*& Out
 		if ((RdIdx != PrevRoadIdx) && IsValid(ConnectedRoadsArray[RdIdx]))
 			break;
 	}
-	OutNextRoad = ConnectedRoadsArray[RdIdx];
-
-	//2. 다음 도로까지 가는 차선 찾기
-	if(OB_IS_VALID(OutNextRoad))
-		OutCurrentLane = GetNextSplinePath(InPrevRoad, OutNextRoad);
+	return ConnectedRoadsArray[RdIdx];
 }
-
 
 double AOmniRoad::GetRoadWidth()
 {

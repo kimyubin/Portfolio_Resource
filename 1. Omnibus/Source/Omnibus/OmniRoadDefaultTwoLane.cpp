@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#pragma once
 #include "OmniRoadDefaultTwoLane.h"
 
 #include "Omnibus.h"
@@ -24,8 +23,8 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 
 	// 에디터 작업 편의성을 위해 기본 스플라인 길이 및 탄젠트 설정. 가상함수라서 호출안하고 상수사용
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
-
-	const FVector           DefaultVector  = FVector(600, 0, 0);
+	const FVector DefaultVector = FVector(600, 0, 0);
+	
 	USplineComponent* const MainRoadSpline = GetRoadSpline(0);
 	MainRoadSpline->SetLocationAtSplinePoint(0, FVector::Zero(), CoordSpace);
 	MainRoadSpline->SetLocationAtSplinePoint(1, DefaultVector, CoordSpace);
@@ -93,7 +92,7 @@ void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
 
 void AOmniRoadDefaultTwoLane::SnapRoadSplineStartEndLocation()
 {
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
 	// 액터와 각 스플라인 포인트 z축 0.0으로 고정.
 	FVector TempActorLocation = GetActorLocation();
@@ -105,26 +104,26 @@ void AOmniRoadDefaultTwoLane::SnapRoadSplineStartEndLocation()
 	
 	for (int i = 0; i < GetMainRoadSpline()->GetNumberOfSplinePoints(); ++i)
 	{
-		FVector SplinePointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i, SplineCoord_Local);
+		FVector SplinePointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i, CoordSpace);
 		if (SplinePointLocation.Z != 0.0)
 		{
 			SplinePointLocation.Z = 0.0;
 			OB_LOG_STR("Note. Locking to z-axis 0.0")
-			GetMainRoadSpline()->SetLocationAtSplinePoint(i, SplinePointLocation, SplineCoord_Local);
+			GetMainRoadSpline()->SetLocationAtSplinePoint(i, SplinePointLocation, CoordSpace);
 		}
 	}
 
 	SetActorLocation(OmniMath::RoundHalfToEvenVector(TempActorLocation, FOmniConst::Unit_Length));
 
 	//스플라인 시작점 반올림.
-	const FVector SplineStartPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(0, SplineCoord_Local);
+	const FVector SplineStartPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(0, CoordSpace);
 	const FVector SplineStartPointRoundHalf = OmniMath::RoundHalfToEvenVector(SplineStartPointPosition, FOmniConst::Unit_Length);
-	GetMainRoadSpline()->SetLocationAtSplinePoint(0, SplineStartPointRoundHalf, SplineCoord_Local);
+	GetMainRoadSpline()->SetLocationAtSplinePoint(0, SplineStartPointRoundHalf, CoordSpace);
 
 	//스플라인 끝점 반올림.
-	const FVector SplineLastPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(GetSplinePointLastIdx(), SplineCoord_Local);
+	const FVector SplineLastPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(GetSplinePointLastIdx(), CoordSpace);
 	const FVector SplineLastPointRoundHalf = OmniMath::RoundHalfToEvenVector(SplineLastPointPosition, FOmniConst::Unit_Length);
-	GetMainRoadSpline()->SetLocationAtSplinePoint(GetSplinePointLastIdx(), SplineLastPointRoundHalf, SplineCoord_Local);
+	GetMainRoadSpline()->SetLocationAtSplinePoint(GetSplinePointLastIdx(), SplineLastPointRoundHalf, CoordSpace);
 }
 
 void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
@@ -132,17 +131,17 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 	if (OB_IS_VALID(PlacedMesh) == false || OB_IS_VALID(GetMainRoadSpline()) == false)
 		return;
 
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
 	//스플라인 컴포넌트 포인트를 따라 스플라인 메시 생성
 	FVector StartLoc, StartTangent;
 	FVector EndLoc, EndTangent;
-	GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(0, StartLoc, StartTangent, SplineCoord_Local);
+	GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(0, StartLoc, StartTangent, CoordSpace);
 
 	const int32 SplinePointLastIdx = GetSplinePointLastIdx();
 	for (int i = 0; i < SplinePointLastIdx; ++i)
 	{
-		GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(i + 1, EndLoc, EndTangent, SplineCoord_Local);
+		GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(i + 1, EndLoc, EndTangent, CoordSpace);
 
 		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), false, FTransform(), false));
 
@@ -169,91 +168,122 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 		|| OB_IS_VALID(GetLaneSpline(1)) == false )
 		return;
 
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
-	USplineComponent* LaneSpline_0 = GetLaneSpline(0);
-	USplineComponent* LaneSpline_1 = GetLaneSpline(1);
-	
+	USplineComponent* const LaneSpline_0 = GetLaneSpline(0);
+	USplineComponent* const LaneSpline_1 = GetLaneSpline(1);
+
 	LaneSpline_0->ClearSplinePoints();
 	LaneSpline_1->ClearSplinePoints();
+	LaneSpline_0->bAllowDiscontinuousSpline = true; // 도착, 출발 탄젠트를 따로 제어
+	LaneSpline_1->bAllowDiscontinuousSpline = true;
 
 	const int32 RoadSplinePointsNum = GetMainRoadSpline()->GetNumberOfSplinePoints();
-	const double RoadWidth          = GetRoadWidth();
+	const double SplineSpacing      = GetRoadWidth() * 0.25; //각 스플라인 간격. 표현할 메시 너비의 1/4 지점에 각각 설치.
 
 	// 메인 RoadSpline의 각 포인트에 맞춰, 좌우 차선 업데이트.
 	for (int i = 0; i < RoadSplinePointsNum; ++i)
 	{
 		//각 포인트 위치 지정
-		const FVector RoadSplineLocation    = GetMainRoadSpline()->GetLocationAtSplinePoint(i, SplineCoord_Local);
-		const FVector RoadSplineRightVector = GetMainRoadSpline()->GetRightVectorAtSplinePoint(i, SplineCoord_Local);
+		const FVector RoadSplineLocation    = GetMainRoadSpline()->GetLocationAtSplinePoint(i, CoordSpace);
+		const FVector RoadSplineRightVector = GetMainRoadSpline()->GetRightVectorAtSplinePoint(i, CoordSpace);
 
-		//각 스플라인 간격. 표현할 메시 너비의 1/4 지점에 각각 설치.
-		const double SplineSpacing = RoadWidth * 0.25;
+		const FVector Lane_00Location = RoadSplineLocation - RoadSplineRightVector * SplineSpacing;
+		const FVector Lane_01Location = RoadSplineLocation + RoadSplineRightVector * SplineSpacing;
 
-		const FVector Lane_01Location = RoadSplineLocation - RoadSplineRightVector * SplineSpacing;
-		const FVector Lane_02Location = RoadSplineLocation + RoadSplineRightVector * SplineSpacing;
+		LaneSpline_0->AddSplinePoint(Lane_00Location, CoordSpace);
+		LaneSpline_1->AddSplinePoint(Lane_01Location, CoordSpace);
+		LaneSpline_0->SetSplinePointType(i, ConvertInterpCurveModeToSplinePointType(CIM_CurveUser));
+		LaneSpline_1->SetSplinePointType(i, ConvertInterpCurveModeToSplinePointType(CIM_CurveUser));
 
-		LaneSpline_0->AddSplinePoint(Lane_01Location, SplineCoord_Local);
-		LaneSpline_0->SetLocationAtSplinePoint(i, Lane_01Location, SplineCoord_Local);
+		const FInterpCurvePointVector& RoadPointCurve = GetMainRoadSpline()->SplineCurves.Position.Points[i];
 
-		LaneSpline_1->AddSplinePoint(Lane_02Location, SplineCoord_Local);
-		LaneSpline_1->SetLocationAtSplinePoint(i, Lane_02Location, SplineCoord_Local);
+		// 도로 탄젠트값과 안쪽, 바깥쪽 코너에 적용할 비율
+		const FVector RoadPointArriveTangent     = RoadPointCurve.ArriveTangent;
+		const FVector RoadPointLeaveTangent      = RoadPointCurve.LeaveTangent;
+		const double RoadPointArriveTangentSize  = RoadPointArriveTangent.Size();
+		const double RoadPointLeaveTangentSize   = RoadPointLeaveTangent.Size();
+		const double InConnerArriveTangentRatio  = (RoadPointArriveTangentSize - (SplineSpacing * 2)) / RoadPointArriveTangentSize;
+		const double OutConnerArriveTangentRatio = (RoadPointArriveTangentSize + (SplineSpacing * 2)) / RoadPointArriveTangentSize;
+		const double InConnerLeaveTangentRatio   = (RoadPointLeaveTangentSize - (SplineSpacing * 2)) / RoadPointLeaveTangentSize;
+		const double OutConnerLeaveTangentRatio  = (RoadPointLeaveTangentSize + (SplineSpacing * 2)) / RoadPointLeaveTangentSize;
 
-		//각 포인트 탄젠트 지정.
-		const FVector RoadSplinePointTangent         = GetMainRoadSpline()->GetTangentAtSplinePoint(i, SplineCoord_Local);
-		const double  InConnerSpacingByTangentRatio  = (RoadSplinePointTangent.Size() - (SplineSpacing * 2)) / RoadSplinePointTangent.Size();
-		const double  OutConnerSpacingByTangentRatio = (RoadSplinePointTangent.Size() + (SplineSpacing * 2)) / RoadSplinePointTangent.Size();
+		FVector Lane_00ArriveTangent = RoadPointArriveTangent;
+		FVector Lane_00LeaveTangent  = RoadPointLeaveTangent;
+		FVector Lane_01ArriveTangent = RoadPointArriveTangent;
+		FVector Lane_01LeaveTangent  = RoadPointLeaveTangent;
 
-		FVector RoadSplinePointTangent_01 = RoadSplinePointTangent;
-		FVector RoadSplinePointTangent_02 = RoadSplinePointTangent;
+		// 이전,다음 도로 Point와 현재 양쪽 차선 Point의 거리를 측정. 더 가까운 차선이 안쪽 차선.
+		// 범위 예외처리 안함. 자동 clamp됨. 넘어간 부분은 더이상 차선이 없기 때문에, 해당 방향의 탄젠트로 임의의 값이 들어가도됨.
+		const FVector PrevPointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i - 1, CoordSpace);
+		const FVector NextPointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i + 1, CoordSpace);
 
-		//다음 '중심' 포인트와 현재 '차선' 포인트를 비교해서 안쪽 차선 찾기
-		FVector TargetPointToCompareLocation; //비교할 목표 지점
-		if (i < RoadSplinePointsNum - 1)
-			TargetPointToCompareLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i + 1, SplineCoord_Local);
-		else
-			TargetPointToCompareLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i - 1, SplineCoord_Local);
+		const double Lane_00PrevDist = FVector::DistSquared(Lane_00Location, PrevPointLocation);
+		const double Lane_00NextDist = FVector::DistSquared(Lane_00Location, NextPointLocation);
+		const double Lane_01PrevDist = FVector::DistSquared(Lane_01Location, PrevPointLocation);
+		const double Lane_01NextDist = FVector::DistSquared(Lane_01Location, NextPointLocation);
 
-		const double Lane_01Distance = FVector::Distance(Lane_01Location, TargetPointToCompareLocation);
-		const double Lane_02Distance = FVector::Distance(Lane_02Location, TargetPointToCompareLocation);
-
-		//1번, 2번 중에 다음 중심 스플라인 포인트와 가까운 차선이 안쪽 차선
-		if (Lane_01Distance < Lane_02Distance)
+		// 이전 구간
+		if (Lane_00PrevDist < Lane_01PrevDist)
 		{
-			RoadSplinePointTangent_01 *= InConnerSpacingByTangentRatio;
-			RoadSplinePointTangent_02 *= OutConnerSpacingByTangentRatio;
+			Lane_00ArriveTangent *= InConnerArriveTangentRatio;
+			Lane_01ArriveTangent *= OutConnerArriveTangentRatio;
 		}
-		else if (Lane_01Distance > Lane_02Distance)
+		else if(Lane_00PrevDist > Lane_01PrevDist)
 		{
-			RoadSplinePointTangent_01 *= OutConnerSpacingByTangentRatio;
-			RoadSplinePointTangent_02 *= InConnerSpacingByTangentRatio;
+			Lane_00ArriveTangent *= OutConnerArriveTangentRatio;
+			Lane_01ArriveTangent *= InConnerArriveTangentRatio;
 		}
-		//else //같다면 직진. 중심선이랑 동일하게
+		
+		// 다음 구간
+		if (Lane_00NextDist < Lane_01NextDist)
+		{
+			Lane_00LeaveTangent *= InConnerLeaveTangentRatio;
+			Lane_01LeaveTangent *= OutConnerLeaveTangentRatio;
+		}
+		else if (Lane_00NextDist > Lane_01NextDist)
+		{
+			Lane_00LeaveTangent *= OutConnerLeaveTangentRatio;
+			Lane_01LeaveTangent *= InConnerLeaveTangentRatio;
+		}
+		// else // 거리가 같거나, 이전/다음 구간이 없다면 직진. 중심도로 값과 동일하게.
 
-		LaneSpline_0->SetTangentAtSplinePoint(i, RoadSplinePointTangent_01, SplineCoord_Local);
-		LaneSpline_1->SetTangentAtSplinePoint(i, RoadSplinePointTangent_02, SplineCoord_Local);
+		FInterpCurvePointVector& Lane_00PointCurve = LaneSpline_0->SplineCurves.Position.Points.Last();
+		FInterpCurvePointVector& Lane_01PointCurve = LaneSpline_1->SplineCurves.Position.Points.Last();
+
+		Lane_00PointCurve.ArriveTangent = Lane_00ArriveTangent;
+		Lane_00PointCurve.LeaveTangent  = Lane_00LeaveTangent;
+
+		Lane_01PointCurve.ArriveTangent = Lane_01ArriveTangent;
+		Lane_01PointCurve.LeaveTangent  = Lane_01LeaveTangent;
 	}
 
 	// 1차선은 역방향이라 포인트 순서 뒤집어줌. 자동차 주행방향을 결정.
-	TArray<FVector> Lane_01PointsLocation;
-	TArray<FVector> Lane_01PointsTangent;
+	TArray<FVector> Lane_00PointsLocation;
+	TArray<FVector> Lane_00PointsArriveTangent;
+	TArray<FVector> Lane_00PointsLeaveTangent;
 	for (int i = LaneSpline_0->GetNumberOfSplinePoints() - 1; i >= 0; --i)
 	{
-		Lane_01PointsLocation.Add(LaneSpline_0->GetLocationAtSplinePoint(i, SplineCoord_Local));
-		Lane_01PointsTangent.Add(LaneSpline_0->GetTangentAtSplinePoint(i, SplineCoord_Local));
+		Lane_00PointsLocation.Add(LaneSpline_0->GetLocationAtSplinePoint(i, CoordSpace));
+		Lane_00PointsArriveTangent.Add(LaneSpline_0->SplineCurves.Position.Points[i].ArriveTangent);
+		Lane_00PointsLeaveTangent.Add(LaneSpline_0->SplineCurves.Position.Points[i].LeaveTangent);
 	}
-	
+
 	for (int i = 0; i < LaneSpline_0->GetNumberOfSplinePoints(); ++i)
 	{
-		LaneSpline_0->SetLocationAtSplinePoint(i, Lane_01PointsLocation[i], SplineCoord_Local);
-		LaneSpline_0->SetTangentAtSplinePoint(i, Lane_01PointsTangent[i] * -1, SplineCoord_Local);
+		LaneSpline_0->SetLocationAtSplinePoint(i, Lane_00PointsLocation[i], CoordSpace);
+		LaneSpline_0->SplineCurves.Position.Points[i].LeaveTangent  = Lane_00PointsArriveTangent[i] * -1;
+		LaneSpline_0->SplineCurves.Position.Points[i].ArriveTangent = Lane_00PointsLeaveTangent[i] * -1;
 	}
+	LaneSpline_0->UpdateSpline();
+	LaneSpline_1->UpdateSpline();
+
 
 	//차선 감지용 콜리전 설정.
 	for (int idx = 0; idx < LaneSplines.Num(); ++idx)
 	{
-		const FVector Lane_StartLoc        = GetLaneSpline(idx)->GetLocationAtSplinePoint(0, SplineCoord_Local);
-		const FVector Lane_StartDirection  = GetLaneSpline(idx)->GetDirectionAtSplinePoint(0, SplineCoord_Local);
+		const FVector Lane_StartLoc        = GetLaneSpline(idx)->GetLocationAtSplinePoint(0, CoordSpace);
+		const FVector Lane_StartDirection  = GetLaneSpline(idx)->GetDirectionAtSplinePoint(0, CoordSpace);
 		const FTransform ApproachTransform = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
 
 		GetLaneApproachBox(idx)->SetBoxExtent(BoxCollisionExtent);
@@ -265,7 +295,7 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 	}
 }
 
-USplineComponent* AOmniRoadDefaultTwoLane::GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
+USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
 {
 	if (OB_IS_VALID(InNextTargetRoad))
 	{
@@ -279,7 +309,7 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetNextSplinePath(const int32 InLaneA
 	return nullptr;
 }
 
-USplineComponent* AOmniRoadDefaultTwoLane::GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	if (OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
 	{

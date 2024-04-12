@@ -65,7 +65,7 @@ void AOmniVehicleBus::BeginPlay()
 	}
 	
 	// 스폰 지역에서 가장 가까운 SplineDistance로 초기화
-	const USplineComponent* SplineComp = MyBusRoute->GetBusRouteSpline();
+	const USplineComponent* SplineComp = MyBusRoute->GetRouteSpline();
 	const float ClosestInputKey        = SplineComp->FindInputKeyClosestToWorldLocation(GetActorLocation());
 	CurrentRouteDistance               = SplineComp->GetDistanceAlongSplineAtSplineInputKey(ClosestInputKey);
 }
@@ -104,7 +104,7 @@ FVector AOmniVehicleBus::GetTargetPointFromRouteSpline(const float DeltaTime)
 	
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::World;
 
-	const USplineComponent* SplineComp = MyBusRoute->GetBusRouteSpline();
+	const USplineComponent* SplineComp = MyBusRoute->GetRouteSpline();
 
 	const float VelocityFactor = DeltaTime * RouteTargetMoveSpeed;
 	const float SplineLen      = SplineComp->GetSplineLength();

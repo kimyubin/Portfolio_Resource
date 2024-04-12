@@ -28,22 +28,29 @@ public:
 	void SpawnBus(const FTransform& SpawnTransform);
 	
 protected:
-	void GetNearestOmniRoadAndLane(AOmniRoad*& OutNearRoad, uint32& OutLaneIdx) const;
+	/** 가장 가까운 2차선을 찾음. */
+	void GetNearestOmniRoadTwoLaneAndLane(AOmniRoad*& OutNearRoad, uint32& OutLaneIdx) const;
 
 	/** 버스 루트 생성. 현재 랜덤으로 생성함. */
 	void GenerateRouteRoad();
+
 	/** 버스 노선 스플라인에 경로(스플라인 차선) 추가*/
 	void PushToRouteSpline(const USplineComponent* InAddLaneSpline);
 
+	void MakeUTurnRouteSpline(const int32 InStartPoint, const int32 InEndPoint);
+
 public:
-	USplineComponent* GetBusRouteSpline() const { return BusRouteSpline; }
-	
+	USplineComponent* GetRouteSpline() const { return RouteSpline; }
+
 protected:
-	
 	TArray<TWeakObjectPtr<AOmniRoad>> BusRouteRoads;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	USplineComponent* BusRouteSpline;
-	
+	USplineComponent* RouteSpline;
+
 	TArray<TWeakObjectPtr<AOmniVehicleBus>> MyBuses;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	TArray<AOmniRoad*> TempBusRouteRoads;
+
 };

@@ -49,8 +49,8 @@ public:
 	// Construction Script 전용 함수 끝.
 	/////////////////////////////////////////////////////////////////////
 
-	virtual USplineComponent* GetNextSplinePath(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
-	virtual USplineComponent* GetNextSplinePath(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
+	virtual USplineComponent* GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
+	virtual USplineComponent* GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
 
 	UFUNCTION()
 	USplineComponent* GetMainRoadSpline() const;

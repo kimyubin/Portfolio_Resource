@@ -26,3 +26,5 @@ DECLARE_LOG_CATEGORY_EXTERN(Omnibus, Log, All);
  * OB_LOG_STR(string)
  */
 #define OB_LOG_STR(Format) UE_LOG(Omnibus, Warning, TEXT("%s %s"), *OB_LOG_FUNC_LINE_INFO, *FString(Format))
+
+#define OB_DEBUG_MSG(Format, ...) GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT(Format), ##__VA_ARGS__), true, FVector2D::UnitVector * 0.75);

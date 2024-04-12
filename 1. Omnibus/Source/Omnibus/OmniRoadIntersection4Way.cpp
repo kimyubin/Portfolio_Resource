@@ -79,7 +79,7 @@ void AOmniRoadIntersection4Way::SetSplinesTransform()
 	if (OB_IS_VALID(Flat4WayMesh) == false || OB_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return;
 
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 	const FIntersectionDimensionInfo       DimensionInfo     = GetIntersectionDimensionInfo();
 
 	if (DimensionInfo.bIsMeshValid == false)
@@ -91,15 +91,15 @@ void AOmniRoadIntersection4Way::SetSplinesTransform()
 	const FVector& X_BasePoint = DimensionInfo.X_BasePoint;
 	
 	//도로 스플라인 위치, 탄젠트 고정.
-	RoadSpline_0->SetLocationAtSplinePoint(0, -Y_BasePoint, SplineCoord_Local);
-	RoadSpline_0->SetLocationAtSplinePoint(1, Y_BasePoint, SplineCoord_Local);
-	RoadSpline_1->SetLocationAtSplinePoint(0, -X_BasePoint, SplineCoord_Local);
-	RoadSpline_1->SetLocationAtSplinePoint(1, X_BasePoint, SplineCoord_Local);
+	RoadSpline_0->SetLocationAtSplinePoint(0, -Y_BasePoint, CoordSpace);
+	RoadSpline_0->SetLocationAtSplinePoint(1, Y_BasePoint, CoordSpace);
+	RoadSpline_1->SetLocationAtSplinePoint(0, -X_BasePoint, CoordSpace);
+	RoadSpline_1->SetLocationAtSplinePoint(1, X_BasePoint, CoordSpace);
 
-	RoadSpline_0->SetTangentAtSplinePoint(0, Y_BasePoint, SplineCoord_Local);
-	RoadSpline_0->SetTangentAtSplinePoint(1, Y_BasePoint, SplineCoord_Local);
-	RoadSpline_1->SetTangentAtSplinePoint(0, X_BasePoint, SplineCoord_Local);
-	RoadSpline_1->SetTangentAtSplinePoint(1, X_BasePoint, SplineCoord_Local);
+	RoadSpline_0->SetTangentAtSplinePoint(0, Y_BasePoint, CoordSpace);
+	RoadSpline_0->SetTangentAtSplinePoint(1, Y_BasePoint, CoordSpace);
+	RoadSpline_1->SetTangentAtSplinePoint(0, X_BasePoint, CoordSpace);
+	RoadSpline_1->SetTangentAtSplinePoint(1, X_BasePoint, CoordSpace);
 
 	for (UOmniDetectSphereComponent* const Detector : RoadConnectDetectors)
 	{
@@ -126,16 +126,16 @@ void AOmniRoadIntersection4Way::SetSplinesTransform()
 		if (OB_IS_VALID(LaneSpline) == false)
 			continue;
 
-		LaneSpline->SetLocationAtSplinePoint(0, StartPoint, SplineCoord_Local);
-		LaneSpline->SetLocationAtSplinePoint(1, EndStraightPoint, SplineCoord_Local);
-		LaneSpline->SetTangentAtSplinePoint(0, LaneTangent, SplineCoord_Local);
-		LaneSpline->SetTangentAtSplinePoint(1, LaneTangent, SplineCoord_Local);
+		LaneSpline->SetLocationAtSplinePoint(0, StartPoint, CoordSpace);
+		LaneSpline->SetLocationAtSplinePoint(1, EndStraightPoint, CoordSpace);
+		LaneSpline->SetTangentAtSplinePoint(0, LaneTangent, CoordSpace);
+		LaneSpline->SetTangentAtSplinePoint(1, LaneTangent, CoordSpace);
 	}
 }
 
 void AOmniRoadIntersection4Way::SetCompTransform()
 {
-	constexpr ESplineCoordinateSpace::Type SplineCoord_Local = ESplineCoordinateSpace::Local;
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
 	for (int i = 0; i < Lane_ApproachBoxes.Num(); ++i)
 	{
@@ -145,8 +145,8 @@ void AOmniRoadIntersection4Way::SetCompTransform()
 			continue;
 
 		LaneApproach->SetBoxExtent(BoxCollisionExtent);
-		const FVector    Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, SplineCoord_Local);
-		const FVector    Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, SplineCoord_Local);
+		const FVector    Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
+		const FVector    Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
 		const FTransform ApproachTransform   = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
 
 		LaneApproach->SetRelativeTransform(ApproachTransform);
