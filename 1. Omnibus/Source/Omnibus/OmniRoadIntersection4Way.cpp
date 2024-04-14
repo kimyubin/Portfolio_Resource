@@ -17,7 +17,7 @@ AOmniRoadIntersection4Way::AOmniRoadIntersection4Way()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	InitArrays(4, 2, 4, 4);
+	InitArrays(2, 4, 4);
 
 	for (int i = 0; i < RoadSplineNum; ++i)
 	{
@@ -39,11 +39,6 @@ AOmniRoadIntersection4Way::AOmniRoadIntersection4Way()
 	for (int i = 0; i < LaneSplineNum; ++i)
 	{
 		InitLaneSpline(i, GetRoadSpline(i / 2));
-	}
-
-	for (int i = 0; i < AccessPointNum; ++i)
-	{
-		InitLaneApproachBox(i, GetLaneSpline(i));
 	}
 
 	const FName Mesh = OmniTool::ConcatStrInt("Intersection4WayMesh", 0);
@@ -137,28 +132,28 @@ void AOmniRoadIntersection4Way::SetCompTransform()
 {
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
-	for (int i = 0; i < Lane_ApproachBoxes.Num(); ++i)
-	{
-		UOmniLaneApproachCollision* const LaneApproach     = GetLaneApproachBox(i);
-		const USplineComponent* const     TargetLaneSpline = GetLaneSpline(i);
-		if (OB_IS_VALID(LaneApproach) == false || OB_IS_VALID(TargetLaneSpline) == false)
-			continue;
-
-		LaneApproach->SetBoxExtent(BoxCollisionExtent);
-		const FVector    Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
-		const FVector    Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
-		const FTransform ApproachTransform   = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
-
-		LaneApproach->SetRelativeTransform(ApproachTransform);
-
-		//디버그용 화살표
-		UArrowComponent* const LaneArrow = GetDebugLaneArrow(i);
-		if (OB_IS_VALID(LaneArrow) == false)
-			continue;
-
-		LaneArrow->SetRelativeLocation(Lane_StartLoc);
-		LaneArrow->SetRelativeRotation(Lane_StartDirection.Rotation());
-	}
+	// for (int i = 0; i < Lane_ApproachBoxes.Num(); ++i)
+	// {
+	// 	UOmniLaneApproachCollision* const LaneApproach     = GetLaneApproachBox(i);
+	// 	const USplineComponent* const     TargetLaneSpline = GetLaneSpline(i);
+	// 	if (OB_IS_VALID(LaneApproach) == false || OB_IS_VALID(TargetLaneSpline) == false)
+	// 		continue;
+	//
+	// 	LaneApproach->SetBoxExtent(BoxCollisionExtent);
+	// 	const FVector    Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
+	// 	const FVector    Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
+	// 	const FTransform ApproachTransform   = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
+	//
+	// 	LaneApproach->SetRelativeTransform(ApproachTransform);
+	//
+	// 	//디버그용 화살표
+	// 	UArrowComponent* const LaneArrow = GetDebugLaneArrow(i);
+	// 	if (OB_IS_VALID(LaneArrow) == false)
+	// 		continue;
+	//
+	// 	LaneArrow->SetRelativeLocation(Lane_StartLoc);
+	// 	LaneArrow->SetRelativeRotation(Lane_StartDirection.Rotation());
+	// }
 }
 
 void AOmniRoadIntersection4Way::SetLanePoints()

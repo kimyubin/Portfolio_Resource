@@ -33,9 +33,9 @@ public:
 	 */
 	virtual void DetectAllConnectedOmniRoad() override;
 	
-	/** RoadSpline의 시작과 끝 위치를 특정 간격으로 스냅하기. z축 0.0으로 고정. */
+	/** RoadSpline의 시작과 끝 위치를 특정 간격으로 스냅하기. z축 0.0으로 고정. 말단위치*/
 	UFUNCTION(BlueprintCallable, Category = PostEditMove)
-	void SnapRoadSplineStartEndLocation();
+	void SnapRoadSplineTerminalLocation();
 
 	/////////////////////////////////////////////////////////////////////
 	// Construction Script 전용 함수 시작.
@@ -49,7 +49,6 @@ public:
 	// Construction Script 전용 함수 끝.
 	/////////////////////////////////////////////////////////////////////
 
-	virtual USplineComponent* GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
 	virtual USplineComponent* GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
 
 	UFUNCTION()

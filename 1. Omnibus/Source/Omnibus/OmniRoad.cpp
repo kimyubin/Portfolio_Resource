@@ -22,7 +22,7 @@ AOmniRoad::AOmniRoad()
 	if (DefaultPlacedMesh.Succeeded())
 		PlacedMesh = DefaultPlacedMesh.Object;
 
-	InitArrays(0, 0, 0, 0);
+	InitArrays(0, 0, 0);
 }
 
 void AOmniRoad::BeginPlay()
@@ -54,6 +54,7 @@ void AOmniRoad::OnConstruction(const FTransform& Transform)
 void AOmniRoad::PostEditMove(bool bFinished)
 {
 	Super::PostEditMove(bFinished);
+	SnapActorLocation();
 	DetectAllConnectedOmniRoad();
 }
 
@@ -76,26 +77,35 @@ void AOmniRoad::DetectAllConnectedOmniRoad()
 	}
 }
 
-void AOmniRoad::InitArrays(const uint8 InAccessPointNum, const uint8 InRoadSplineNum, const uint8 InRoadConnectDetectorNum,
-                           const uint8 InLaneSplineNum)
+void AOmniRoad::SnapActorLocation()
 {
-	AccessPointNum         = InAccessPointNum;
+	FVector TempActorLocation = GetActorLocation();
+	if (TempActorLocation.Z != 0.0)
+	{
+		OB_LOG_STR("Note. Locking to z-axis 0.0")
+		TempActorLocation.Z = 0.0;
+	}
+	
+	SetActorLocation(OmniMath::RoundHalfToEvenVector(TempActorLocation, FOmniConst::Unit_Length));
+}
+
+
+void AOmniRoad::InitArrays(const uint8 InRoadSplineNum, const uint8 InRoadConnectDetectorNum, const uint8 InLaneSplineNum)
+{
 	RoadSplineNum          = InRoadSplineNum;
 	RoadConnectDetectorNum = InRoadConnectDetectorNum;
 	LaneSplineNum          = InLaneSplineNum;
 
 	ConnectedRoadsArray.Empty();
-	RoadSplines.Empty();
 	RoadConnectDetectors.Empty();
+	RoadSplines.Empty();
 	LaneSplines.Empty();
-	Lane_ApproachBoxes.Empty();
 	Debug_LaneArrows.Empty();
 
-	ConnectedRoadsArray.SetNum(AccessPointNum);
-	RoadSplines.SetNum(RoadSplineNum);
+	ConnectedRoadsArray.SetNum(RoadConnectDetectorNum);
 	RoadConnectDetectors.SetNum(RoadConnectDetectorNum);
+	RoadSplines.SetNum(RoadSplineNum);
 	LaneSplines.SetNum(LaneSplineNum);
-	Lane_ApproachBoxes.SetNum(AccessPointNum);
 	Debug_LaneArrows.SetNum(LaneSplineNum);
 }
 
@@ -138,31 +148,16 @@ void AOmniRoad::InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoad
 
 	const FName LaneSplineName            = OmniTool::ConcatStrInt("LaneSpline", InIdx);
 	USplineComponent* const CurLaneSpline = CreateDefaultSubobject<USplineComponent>(LaneSplineName);
-
 	if (OB_IS_VALID(CurLaneSpline) == false)
 		return;
 
 	LaneSplines[InIdx] = CurLaneSpline;
 	CurLaneSpline->SetupAttachment(InOwnerRoadSpline);
-}
 
-void AOmniRoad::InitLaneApproachBox(const uint32 InIdx, USplineComponent* InOwnerLaneSpline)
-{
-	check(Lane_ApproachBoxes.IsValidIndex(InIdx))
-	check(Debug_LaneArrows.IsValidIndex(InIdx))
-	if (OB_IS_VALID(InOwnerLaneSpline) == false)
-		return;
-
-	const FName LaneApproachBoxName                      = OmniTool::ConcatStrInt("LaneApproachBox", InIdx);
-	UOmniLaneApproachCollision* const CurLaneApproachBox = CreateDefaultSubobject<UOmniLaneApproachCollision>(LaneApproachBoxName);
-	if (OB_IS_VALID(CurLaneApproachBox) == false)
-		return;
-
-	Lane_ApproachBoxes[InIdx] = CurLaneApproachBox;
-	CurLaneApproachBox->SetupAttachment(InOwnerLaneSpline);
-	CurLaneApproachBox->InitLaneApproach(this, InIdx);
-
+	////////////////////
 	// 디버그용 화살표
+	check(Debug_LaneArrows.IsValidIndex(InIdx))
+
 	const FName DebugArrowName               = OmniTool::ConcatStrInt("DebugArrow", InIdx);
 	UArrowComponent* const CurDebugLaneArrow = CreateDefaultSubobject<UArrowComponent>(DebugArrowName);
 	if (OB_IS_VALID(CurDebugLaneArrow) == false)
@@ -173,22 +168,7 @@ void AOmniRoad::InitLaneApproachBox(const uint32 InIdx, USplineComponent* InOwne
 	CurDebugLaneArrow->bIsEditorOnly = true;
 	CurDebugLaneArrow->ArrowSize     = 2.f;
 	CurDebugLaneArrow->ArrowColor    = FColor::Purple;
-	CurDebugLaneArrow->SetupAttachment(InOwnerLaneSpline);
-}
-
-USplineComponent* AOmniRoad::GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
-{
-	OB_LOG("omniRoad에서 로드됨")
-	if (OB_IS_VALID(InNextTargetRoad))
-	{
-		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
-		if (NextRoadIdx != INDEX_NONE)
-		{
-			return nullptr; // GetRoadSpline(NextRoadIdx);
-		}
-	}
-
-	return nullptr;
+	CurDebugLaneArrow->SetupAttachment(CurLaneSpline);
 }
 
 USplineComponent* AOmniRoad::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
@@ -224,16 +204,6 @@ USplineComponent* AOmniRoad::GetLaneSpline(const uint32 InIdx) const
 
 	if (IsValid(LaneSplines[InIdx]))
 		return LaneSplines[InIdx];
-
-	return nullptr;
-}
-
-UOmniLaneApproachCollision* AOmniRoad::GetLaneApproachBox(const uint32 InIdx) const
-{
-	check(Lane_ApproachBoxes.IsValidIndex(InIdx))
-
-	if (IsValid(Lane_ApproachBoxes[InIdx]))
-		return Lane_ApproachBoxes[InIdx];
 
 	return nullptr;
 }
@@ -391,15 +361,14 @@ AOmniRoad* AOmniRoad::GetRandomNextRoad(AOmniRoad* InPrevRoad)
 	std::mt19937 rdEngine(deviceSeed());
 	std::uniform_int_distribution<int> rdRange(0, ConnectedRoadsArray.Num() - 1);
 
-	int32 RdIdx(0);
 	constexpr int LoopLimit = 1000;
 	for (int i = 0; i < LoopLimit; ++i)
 	{
-		RdIdx = rdRange(rdEngine);
-		if ((RdIdx != PrevRoadIdx) && IsValid(ConnectedRoadsArray[RdIdx]))
-			break;
+		const int32 RdIdx = rdRange(rdEngine);
+		if ((RdIdx != PrevRoadIdx) && ConnectedRoadsArray.IsValidIndex(RdIdx) && OB_IS_VALID(ConnectedRoadsArray[RdIdx]))
+			return ConnectedRoadsArray[RdIdx];
 	}
-	return ConnectedRoadsArray[RdIdx];
+	return nullptr;
 }
 
 double AOmniRoad::GetRoadWidth()

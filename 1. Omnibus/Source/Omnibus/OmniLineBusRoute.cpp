@@ -162,9 +162,7 @@ void AOmniLineBusRoute::GenerateRouteRoad()
 			PushToRouteSpline(CurrentLane);
 			MakeUTurnRouteSpline(RouteSpline->GetNumberOfSplinePoints() - 1, 0);
 		}
-		
 	}
-
 
 	for (auto& Road : BusRouteRoads)
 	{
@@ -223,7 +221,7 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 	const float NextEndPointDist   = RouteSpline->GetDistanceAlongSplineAtSplinePoint(InEndPoint + 1);
 
 	// 두 차선의 직전 구간 길이의 평균에서 차선 간격(절반)만큼 후퇴.
-	// 평균에서 후퇴한 비율을 좌우 차선에 대입해서 후퇴. 같은 비율만큼 후퇴. 해당 지점에서 U턴.
+	// 평균에서 후퇴한 비율을 좌우 차선에 대입해서 후퇴. 해당 지점에서 U턴.
 	const double HalfLaneSpacing    = (StartPointPos - EndPointPos).Length() / 2.0;
 	const double StartSectionDist   = std::abs(StartPointDist - PrevStartPointDist);
 	const double EndSectionDist     = std::abs(EndPointDist - NextEndPointDist);
@@ -242,21 +240,16 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 	RouteSpline->SetLocationAtSplinePoint(InStartPoint, TurnStartPointPos, CoordSpace);
 	RouteSpline->SetLocationAtSplinePoint(InEndPoint, TurnEndPointPos, CoordSpace);
 
-	// 변화율
-	const double StartRate = (TurnStartPointDist - PrevStartPointDist) / (StartPointDist - PrevStartPointDist);
-	const double EndRate   = (TurnEndPointDist - NextEndPointDist) / (EndPointDist - NextEndPointDist);
-
-	// U턴하는 방향과 그 수직하는 방향의 노말. 수직 노말 방향을 U턴 구역의 Tangent로 사용함.  
-	const FVector StartToEndNormal  = (TurnEndPointPos - TurnStartPointPos).GetSafeNormal();
-	const FVector TurnTangentNormal = FVector(StartToEndNormal.Y, -StartToEndNormal.X, StartToEndNormal.Z);
-
-	FInterpCurvePointVector& StartPointCurve = RouteSpline->SplineCurves.Position.Points[InStartPoint];
-	StartPointCurve.ArriveTangent            = TurnStartPointTangent * StartRate;
-	StartPointCurve.LeaveTangent             = -1 * TurnTangentNormal * HalfLaneSpacing * 4;
-
-	FInterpCurvePointVector& EndPointCurve = RouteSpline->SplineCurves.Position.Points[InEndPoint];
-	EndPointCurve.ArriveTangent            = TurnTangentNormal * HalfLaneSpacing * 4;
-	EndPointCurve.LeaveTangent             = TurnEndPointTangent * EndRate;
+	// 좌회전(U턴) 방향에 수직 방향(시계방향 회전. 직진방향)  
+	const FVector StartToEndNormal = (TurnEndPointPos - TurnStartPointPos).GetSafeNormal();
+	const FVector TurnTangent      = FVector(StartToEndNormal.Y, -StartToEndNormal.X, StartToEndNormal.Z) * HalfLaneSpacing * 4;
+	const double AvgBackRate       = 1 - AvgSpacingRate; // 변화율
+	
+	RouteSpline->SplineCurves.Position.Points[InStartPoint].ArriveTangent = TurnStartPointTangent * AvgBackRate;
+	RouteSpline->SplineCurves.Position.Points[InStartPoint].LeaveTangent  = -1 * TurnTangent;
+	
+	RouteSpline->SplineCurves.Position.Points[InEndPoint].ArriveTangent   = TurnTangent;
+	RouteSpline->SplineCurves.Position.Points[InEndPoint].LeaveTangent    = TurnEndPointTangent * AvgBackRate;
 
 	RouteSpline->UpdateSpline();
 }

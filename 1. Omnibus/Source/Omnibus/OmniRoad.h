@@ -38,37 +38,36 @@ public:
 	UFUNCTION(BlueprintCallable, Category = PostEditMove)
 	virtual void DetectAllConnectedOmniRoad();
 
+	/** 액터 위치 스냅하기. z축 0.0으로 고정. */
+	UFUNCTION(BlueprintCallable, Category = PostEditMove)
+	void SnapActorLocation();
+
 protected:
 	/**
 	 * 컴포넌트 개수를 결정하는 변수 초기화 및 다음 TArray를 해당 개수만큼 초기화.
-	 * @param InAccessPointNum : 도로 접속 지점 개수. ConnectedRoadsArray, Lane_ApproachBoxes
 	 * @param InRoadSplineNum : 도로 스플라인 개수. RoadSplines
-	 * @param InRoadConnectDetectorNum : 도로 연결 감지 컴포넌트 개수. RoadConnectDetectors
+	 * @param InRoadConnectDetectorNum : 도로 연결 감지 컴포넌트 개수. RoadConnectDetectors, ConnectedRoadsArray
 	 * @param InLaneSplineNum : 차선 개수. LaneSplines, Debug_LaneArrows
 	 */
-	void InitArrays(const uint8 InAccessPointNum
-	              , const uint8 InRoadSplineNum
+	void InitArrays(const uint8 InRoadSplineNum
 	              , const uint8 InRoadConnectDetectorNum
 	              , const uint8 InLaneSplineNum);
 
 	void InitRoadSpline(const uint32 InIdx);
 	void InitRoadConnectDetector(const uint32 InIdx, USplineComponent* InOwnerRoadSpline, const uint32 InSplinePointIdx);
 	void InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoadSpline);
-	void InitLaneApproachBox(const uint32 InIdx, USplineComponent* InOwnerLaneSpline);
 
 public:
 	/**
-	 * 자신의 Lane_ApproachBox에 근접한 버스를 다음 목표 도로로 갈 수 있는 자신의 Lane을 반환.
-	 * @param InLaneApproachIdx 접근한 방향. Lane_ApproachBoxes의 인덱스
+	 * 이전 도로와 다음 도로를 이어주는 자신의 차선 반환.
+	 * @param InPrevRoad 접근한 도로.
 	 * @param InNextTargetRoad 다음 이동해야할 도로
 	 * @return 다음 차선 lane
 	 */
-	virtual USplineComponent*   GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad);
 	virtual USplineComponent*   GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad);
 	
 	USplineComponent*           GetRoadSpline(const uint32 InIdx) const;
 	USplineComponent*           GetLaneSpline(const uint32 InIdx) const;
-	UOmniLaneApproachCollision* GetLaneApproachBox(const uint32 InIdx) const;
 	UArrowComponent*            GetDebugLaneArrow(const uint32 InIdx) const;
 
 	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx);
@@ -139,8 +138,8 @@ protected:
 	TArray<USplineComponent*> LaneSplines;
 
 	/** 각 차선 진입 직전 감지용 박스 콜리전.*/
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TArray<UOmniLaneApproachCollision*> Lane_ApproachBoxes;
+	// UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	// TArray<UOmniLaneApproachCollision*> Lane_ApproachBoxes;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TArray<UArrowComponent*> Debug_LaneArrows;
@@ -157,9 +156,6 @@ protected:
 
 	double BoxCollisionOffset;
 
-	/** 도로 연결 지점 개수 */
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	uint8 AccessPointNum;
 	/** 도로 중앙선 개수 */
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	uint8 RoadSplineNum;

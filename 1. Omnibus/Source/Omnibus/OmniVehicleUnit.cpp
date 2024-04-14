@@ -102,15 +102,15 @@ void AOmniVehicleUnit::BeginOverlapSensor(UPrimitiveComponent* OverlappedComp, A
 {
 	if (OtherComp->IsA(UOmniLaneApproachCollision::StaticClass()))
 	{
-		const UOmniLaneApproachCollision* LaneApproach = Cast<UOmniLaneApproachCollision>(OtherComp);
-		USplineComponent* NextLane = LaneApproach->GetNextSplineByRoad(GetNextRouteRoad());
-
-		// 다음 레인을 찾지 못했다면, 중복 Overlap 발생한 것이기 때문에 넘어감. 
-		if (OB_IS_VALID(NextLane) == true)
-		{
-			CurrentLane = NextLane;
-			++CurrentRouteRoadIdx;
-		}
+		// const UOmniLaneApproachCollision* LaneApproach = Cast<UOmniLaneApproachCollision>(OtherComp);
+		// USplineComponent* NextLane = LaneApproach->GetNextSplineByRoad(GetNextRouteRoad());
+		//
+		// // 다음 레인을 찾지 못했다면, 중복 Overlap 발생한 것이기 때문에 넘어감. 
+		// if (OB_IS_VALID(NextLane) == true)
+		// {
+		// 	CurrentLane = NextLane;
+		// 	++CurrentRouteRoadIdx;
+		// }
 	}
 }
 

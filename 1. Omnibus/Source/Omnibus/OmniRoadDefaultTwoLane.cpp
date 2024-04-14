@@ -17,7 +17,7 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	InitArrays(2, 1, 2, 2);
+	InitArrays(1, 2, 2);
 
 	InitRoadSpline(0);
 
@@ -39,11 +39,6 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 	for (int i = 0; i < LaneSplineNum; ++i)
 	{
 		InitLaneSpline(i, GetMainRoadSpline());
-	}
-
-	for (int i = 0; i < AccessPointNum; ++i)
-	{
-		InitLaneApproachBox(i, GetLaneSpline(i));
 	}
 }
 
@@ -67,7 +62,7 @@ void AOmniRoadDefaultTwoLane::Tick(float DeltaTime)
 void AOmniRoadDefaultTwoLane::PostEditMove(bool bFinished)
 {
 	Super::PostEditMove(bFinished);
-	SnapRoadSplineStartEndLocation();
+	SnapRoadSplineTerminalLocation();
 }
 
 void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
@@ -86,22 +81,14 @@ void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
 			continue;
 			
 		Detector->ChangeSplineTangentNormal(DetectedTargetSphere);
-
 	}
 }
 
-void AOmniRoadDefaultTwoLane::SnapRoadSplineStartEndLocation()
+void AOmniRoadDefaultTwoLane::SnapRoadSplineTerminalLocation()
 {
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
-	// 액터와 각 스플라인 포인트 z축 0.0으로 고정.
-	FVector TempActorLocation = GetActorLocation();
-	if (TempActorLocation.Z != 0.0)
-	{
-		OB_LOG_STR("Note. Locking to z-axis 0.0")
-		TempActorLocation.Z = 0.0;
-	}
-	
+	// 각 스플라인 포인트 z축 0.0으로 고정.
 	for (int i = 0; i < GetMainRoadSpline()->GetNumberOfSplinePoints(); ++i)
 	{
 		FVector SplinePointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i, CoordSpace);
@@ -112,8 +99,6 @@ void AOmniRoadDefaultTwoLane::SnapRoadSplineStartEndLocation()
 			GetMainRoadSpline()->SetLocationAtSplinePoint(i, SplinePointLocation, CoordSpace);
 		}
 	}
-
-	SetActorLocation(OmniMath::RoundHalfToEvenVector(TempActorLocation, FOmniConst::Unit_Length));
 
 	//스플라인 시작점 반올림.
 	const FVector SplineStartPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(0, CoordSpace);
@@ -278,35 +263,15 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 	LaneSpline_0->UpdateSpline();
 	LaneSpline_1->UpdateSpline();
 
-
-	//차선 감지용 콜리전 설정.
 	for (int idx = 0; idx < LaneSplines.Num(); ++idx)
 	{
 		const FVector Lane_StartLoc        = GetLaneSpline(idx)->GetLocationAtSplinePoint(0, CoordSpace);
 		const FVector Lane_StartDirection  = GetLaneSpline(idx)->GetDirectionAtSplinePoint(0, CoordSpace);
-		const FTransform ApproachTransform = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
-
-		GetLaneApproachBox(idx)->SetBoxExtent(BoxCollisionExtent);
-		GetLaneApproachBox(idx)->SetRelativeTransform(ApproachTransform);
 
 		//디버그용 화살 위치 지정.
 		GetDebugLaneArrow(idx)->SetRelativeLocation(Lane_StartLoc);
 		GetDebugLaneArrow(idx)->SetRelativeRotation(Lane_StartDirection.Rotation());
 	}
-}
-
-USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
-{
-	if (OB_IS_VALID(InNextTargetRoad))
-	{
-		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
-		if (NextRoadIdx != INDEX_NONE)
-		{
-			return GetLaneSpline(InLaneApproachIdx);
-		}
-	}
-
-	return nullptr;
 }
 
 USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
@@ -324,8 +289,6 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrev
 
 	return nullptr;
 }
-
-
 
 USplineComponent* AOmniRoadDefaultTwoLane::GetMainRoadSpline() const
 {

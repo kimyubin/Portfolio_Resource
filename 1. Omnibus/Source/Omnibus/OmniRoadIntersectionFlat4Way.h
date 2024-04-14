@@ -52,7 +52,6 @@ public:
 	 */
 	FIntersectionDimensionInfo GetIntersectionDimensionInfo();
 
-	virtual USplineComponent* GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad) override;
 	virtual USplineComponent* GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
 
 	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx) override;
@@ -60,8 +59,13 @@ public:
 private:
 	ERoadDirection GetLaneDirectionByConnectedIdx(const uint32 StartLaneApproachIdx, const uint32 TargetRoadIdx) const;
 
-	static uint32 ConvertDetectorIdxToConnectRoadIdx(const uint32 InDetectorIdx);
-	static uint32 ConvertConnectRoadIdxToDetectorIdx(const uint32 InConnectRoadIdx);
+	/**
+	 * DetectorIdx를 바탕으로 Detector가 있어야할 위치를 Idx 형식으로 반환.
+	 * @param InDetectorIdx 찾고자하는 Detector의 index
+	 * @param OutRoadIdx 해당 Detector의 부모 도로
+	 * @param OutSplinePointIdx 해당 Detector가 부모 도로에서 있어야할 위치. SplinePointIndex
+	 */
+	static void GetDetectorPositionIdx(const uint32 InDetectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx);
 	
 
 public:

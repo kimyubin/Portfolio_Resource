@@ -16,34 +16,33 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	InitArrays(4, 2, 4, 12);
+	InitArrays(2, 4, 12);
 
 	for (int i = 0; i < RoadSplineNum; ++i)
 	{
 		InitRoadSpline(i);
 	}
 
-	for (int i = 0; i < RoadConnectDetectorNum; ++i)
+	for (int DetectorIdx = 0; DetectorIdx < RoadConnectDetectorNum; ++DetectorIdx)
 	{
-		const uint32 RoadSplineIdx = i / 2;
-		if (RoadSplines.IsValidIndex(RoadSplineIdx) == false)
+		uint32 RoadIdx;
+		uint32 RoadSplinePointIdx;
+		
+		GetDetectorPositionIdx(DetectorIdx, RoadIdx, RoadSplinePointIdx);
+
+		if (RoadSplines.IsValidIndex(RoadIdx) == false)
 		{
-			OB_LOG("RoadSplines Invalid Index %d", RoadSplineIdx)
+			OB_LOG("RoadSplines Invalid Index %d", RoadIdx)
 			return;
 		}
 		
-		USplineComponent* RoadSpline = RoadSplines[RoadSplineIdx];
-		InitRoadConnectDetector(i, RoadSpline, i % 2);
+		USplineComponent* RoadSpline = RoadSplines[RoadIdx];
+		InitRoadConnectDetector(DetectorIdx, RoadSpline, RoadSplinePointIdx);
 	}
 
 	for (int i = 0; i < LaneSplineNum; ++i)
 	{
 		InitLaneSpline(i, GetRoadSpline(i / 6));
-	}
-
-	for (int i = 0; i < AccessPointNum; ++i)
-	{
-		InitLaneApproachBox(i, GetLaneSpline(i * 3));
 	}
 
 	const FName Mesh = OmniTool::ConcatStrInt("Flat4WayMesh", 0);
@@ -159,26 +158,20 @@ void AOmniRoadIntersectionFlat4Way::SetCompTransform()
 {
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
-	for (int i = 0; i < Lane_ApproachBoxes.Num(); ++i)
+	for (int i = 0; i < Debug_LaneArrows.Num(); ++i)
 	{
-		UOmniLaneApproachCollision* const LaneApproach     = GetLaneApproachBox(i);
-		const USplineComponent*           TargetLaneSpline = GetLaneSpline(i * 3);
-		if (OB_IS_VALID(LaneApproach) == false || OB_IS_VALID(TargetLaneSpline) == false)
+		const USplineComponent* TargetLaneSpline = GetLaneSpline(i);
+		if (OB_IS_VALID(TargetLaneSpline) == false)
 			continue;
 
-		LaneApproach->SetBoxExtent(BoxCollisionExtent);
-
-		const FVector    Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
-		const FVector    Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
-		const FTransform ApproachTransform   = OmniMath::GetTransformAddOffset(Lane_StartLoc, Lane_StartDirection, BoxCollisionOffset);
-
-		LaneApproach->SetRelativeTransform(ApproachTransform);
+		const FVector Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
+		const FVector Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
 
 		// 디버그 화살표
 		UArrowComponent* const LaneArrow = GetDebugLaneArrow(i);
 		if (OB_IS_VALID(LaneArrow) == false)
 			continue;
-		
+
 		LaneArrow->SetRelativeLocation(Lane_StartLoc);
 		LaneArrow->SetRelativeRotation(Lane_StartDirection.Rotation());
 	}
@@ -250,21 +243,6 @@ FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensi
 	return Result;
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetSplineToNextRoad(const int32 InLaneApproachIdx, AOmniRoad* InNextTargetRoad)
-{
-	if (OB_IS_VALID(InNextTargetRoad))
-	{
-		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
-		if (NextRoadIdx != INDEX_NONE)
-		{
-			const ERoadDirection Direction = (GetLaneDirectionByConnectedIdx(InLaneApproachIdx, NextRoadIdx));
-			return GetLaneByApproachIdx(InLaneApproachIdx, Direction);
-		}
-	}
-
-	return nullptr;
-}
-
 USplineComponent* AOmniRoadIntersectionFlat4Way::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	if (OB_IS_VALID(InNextTargetRoad))
@@ -281,15 +259,12 @@ USplineComponent* AOmniRoadIntersectionFlat4Way::GetSplineToNextRoad(AOmniRoad* 
 	return nullptr;
 }
 
-
 void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx)
 {
 	if (OB_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
 	{
-		const uint8 ConvertAccessIdx = ConvertDetectorIdxToConnectRoadIdx(InAccessIdx);
-		
-		if (ConnectedRoadsArray.IsValidIndex(ConvertAccessIdx))
-			ConnectedRoadsArray[ConvertAccessIdx] = InRoad;
+		if (ConnectedRoadsArray.IsValidIndex(InAccessIdx))
+			ConnectedRoadsArray[InAccessIdx] = InRoad;
 		else
 			OB_LOG_STR("InAccessIdx : invalid value")
 	}
@@ -297,7 +272,6 @@ void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, co
 
 ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(const uint32 StartLaneApproachIdx, const uint32 TargetRoadIdx) const
 {
-	check(Lane_ApproachBoxes.IsValidIndex(StartLaneApproachIdx))
 	check(ConnectedRoadsArray.IsValidIndex(TargetRoadIdx))
 
 	ERoadDirection Direction      = ERoadDirection::Straight;
@@ -321,44 +295,27 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	return Direction;
 }
 
-uint32 AOmniRoadIntersectionFlat4Way::ConvertDetectorIdxToConnectRoadIdx(const uint32 InDetectorIdx)
-{
-    /**
-     * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
-     * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
-     *      0            0
-     *   2     3  =>  3     1
-     *      1            2
-     */
-	uint32 ResConnectRoadIdx = InDetectorIdx;
-	switch (InDetectorIdx)
-	{
-		case 0: ResConnectRoadIdx = 0; break;
-		case 3: ResConnectRoadIdx = 1; break;
-		case 1: ResConnectRoadIdx = 2; break;
-		case 2: ResConnectRoadIdx = 3; break;
-		default: break;
-	}
-	return ResConnectRoadIdx;
-}
-
-uint32 AOmniRoadIntersectionFlat4Way::ConvertConnectRoadIdxToDetectorIdx(const uint32 InConnectRoadIdx)
+void AOmniRoadIntersectionFlat4Way::GetDetectorPositionIdx(const uint32 InDetectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx)
 {
 	/**
-	 * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
-	 * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
-	 *      0            0
-	 *   2     3  <=  3     1
-	 *      1            2
+     * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
+     * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
+     *    0          0           0-0
+     * 3     1 => 2     3 => 1-0     1-1
+     *    2          1           0-1
 	 */
-	uint32 ResConnectRoadIdx = InConnectRoadIdx;
-	switch (InConnectRoadIdx)
+	uint32 RoadPointIdx = InDetectorIdx;
+	switch (InDetectorIdx)
 	{
-		case 0: ResConnectRoadIdx = 0; break;
-		case 1: ResConnectRoadIdx = 3; break;
-		case 2: ResConnectRoadIdx = 1; break;
-		case 3: ResConnectRoadIdx = 2; break;
+		case 0: RoadPointIdx = 0; break;
+		case 1: RoadPointIdx = 3; break;
+		case 2: RoadPointIdx = 1; break;
+		case 3: RoadPointIdx = 2; break;
 		default: break;
 	}
-	return ResConnectRoadIdx;
+
+	// 몫==도로 번호, 나머지==SplinePoint
+	auto [quot, rem]  = std::div(RoadPointIdx, 2);
+	OutRoadIdx        = quot;
+	OutSplinePointIdx = rem;
 }

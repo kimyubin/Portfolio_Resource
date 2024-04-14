@@ -10,13 +10,15 @@ AOmniStationBusStop::AOmniStationBusStop()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BusStopMesh      = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BusStopMesh"));
-	RootComponent    = BusStopMesh;
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+
+	BusStopMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BusStopMesh"));
+	BusStopMesh->SetupAttachment(RootComponent);
 
 	DecelerationArea = CreateDefaultSubobject<UBoxComponent>(TEXT("DecelerationArea"));
 	DecelerationArea->SetupAttachment(RootComponent);
 
-	BusStopArea      = CreateDefaultSubobject<UBoxComponent>(TEXT("BusStopArea"));
+	BusStopArea = CreateDefaultSubobject<UBoxComponent>(TEXT("BusStopArea"));
 	BusStopArea->SetupAttachment(RootComponent);
 }
 
