@@ -31,9 +31,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = CustomConstructionScript)
 	void SetSplinesTransform();
 
-	UFUNCTION(BlueprintCallable, Category = CustomConstructionScript)
-	void SetCompTransform();
-
 	UFUNCTION()
 	void SetLanePoints();
 

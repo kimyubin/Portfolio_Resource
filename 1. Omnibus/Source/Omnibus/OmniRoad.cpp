@@ -9,8 +9,6 @@
 #include "OmnibusUtilities.h"
 #include "OmniDetectSphereComponent.h"
 #include "OmniStationBusStop.h"
-#include "Components/ArrowComponent.h"
-#include "OmniLaneApproachCollision.h"
 #include "Components/SplineComponent.h"
 
 AOmniRoad::AOmniRoad()
@@ -100,13 +98,11 @@ void AOmniRoad::InitArrays(const uint8 InRoadSplineNum, const uint8 InRoadConnec
 	RoadConnectDetectors.Empty();
 	RoadSplines.Empty();
 	LaneSplines.Empty();
-	Debug_LaneArrows.Empty();
 
 	ConnectedRoadsArray.SetNum(RoadConnectDetectorNum);
 	RoadConnectDetectors.SetNum(RoadConnectDetectorNum);
 	RoadSplines.SetNum(RoadSplineNum);
 	LaneSplines.SetNum(LaneSplineNum);
-	Debug_LaneArrows.SetNum(LaneSplineNum);
 }
 
 void AOmniRoad::InitRoadSpline(const uint32 InIdx)
@@ -153,36 +149,11 @@ void AOmniRoad::InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoad
 
 	LaneSplines[InIdx] = CurLaneSpline;
 	CurLaneSpline->SetupAttachment(InOwnerRoadSpline);
-
-	////////////////////
-	// 디버그용 화살표
-	check(Debug_LaneArrows.IsValidIndex(InIdx))
-
-	const FName DebugArrowName               = OmniTool::ConcatStrInt("DebugArrow", InIdx);
-	UArrowComponent* const CurDebugLaneArrow = CreateDefaultSubobject<UArrowComponent>(DebugArrowName);
-	if (OB_IS_VALID(CurDebugLaneArrow) == false)
-		return;
-
-	Debug_LaneArrows[InIdx] = CurDebugLaneArrow;
-	CurDebugLaneArrow->SetHiddenInGame(true);
-	CurDebugLaneArrow->bIsEditorOnly = true;
-	CurDebugLaneArrow->ArrowSize     = 2.f;
-	CurDebugLaneArrow->ArrowColor    = FColor::Purple;
-	CurDebugLaneArrow->SetupAttachment(CurLaneSpline);
 }
 
 USplineComponent* AOmniRoad::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	OB_LOG("omniRoad에서 로드됨")
-	if (OB_IS_VALID(InNextTargetRoad))
-	{
-		const int PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
-		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
-		if (NextRoadIdx != INDEX_NONE)
-		{
-			return nullptr;
-		}
-	}
 
 	return nullptr;
 }
@@ -204,16 +175,6 @@ USplineComponent* AOmniRoad::GetLaneSpline(const uint32 InIdx) const
 
 	if (IsValid(LaneSplines[InIdx]))
 		return LaneSplines[InIdx];
-
-	return nullptr;
-}
-
-UArrowComponent* AOmniRoad::GetDebugLaneArrow(const uint32 InIdx) const
-{
-	check(Debug_LaneArrows.IsValidIndex(InIdx))
-
-	if (IsValid(Debug_LaneArrows[InIdx]))
-		return Debug_LaneArrows[InIdx];
 
 	return nullptr;
 }
@@ -365,7 +326,7 @@ AOmniRoad* AOmniRoad::GetRandomNextRoad(AOmniRoad* InPrevRoad)
 	for (int i = 0; i < LoopLimit; ++i)
 	{
 		const int32 RdIdx = rdRange(rdEngine);
-		if ((RdIdx != PrevRoadIdx) && ConnectedRoadsArray.IsValidIndex(RdIdx) && OB_IS_VALID(ConnectedRoadsArray[RdIdx]))
+		if ((RdIdx != PrevRoadIdx) && ConnectedRoadsArray.IsValidIndex(RdIdx) && IsValid(ConnectedRoadsArray[RdIdx]))
 			return ConnectedRoadsArray[RdIdx];
 	}
 	return nullptr;

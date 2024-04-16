@@ -2,22 +2,15 @@
 
 #include "OmniVehicleBus.h"
 
-#include "NavigationSystem.h"
 #include "OmniAICtrlBus.h"
 #include "Omnibus.h"
 #include "OmnibusTypes.h"
 #include "OmnibusUtilities.h"
-#include "OmniLaneApproachCollision.h"
 #include "OmniLineBusRoute.h"
-#include "OmniRoadDefaultTwoLane.h"
-#include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Components/BoxComponent.h"
 #include "Components/SplineComponent.h"
-#include "Components/TextRenderComponent.h"
-#include "Engine/TextRenderActor.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/SpectatorPawnMovement.h"
-#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -110,9 +103,9 @@ FVector AOmniVehicleBus::GetTargetPointFromRouteSpline(const float DeltaTime)
 	const float SplineLen      = SplineComp->GetSplineLength();
 	CurrentRouteDistance       = OmniMath::CircularNumF(SplineLen, CurrentRouteDistance + VelocityFactor);
 	const FVector TargetPoint  = SplineComp->GetLocationAtDistanceAlongSpline(CurrentRouteDistance, CoordSpace);
-	
-	TIME_LIMIT_TEXT_RENDER(FVector(TargetPoint.X,TargetPoint.Y,10), 1.5, FText::FromString("1"), 50);
-	
+
+	UKismetSystemLibrary::DrawDebugSphere(this, FVector(TargetPoint.X, TargetPoint.Y, 10), 12.f, 12, FLinearColor::Red, 1.5f, 5.f);
+
 	return TargetPoint;
 }
 

@@ -6,8 +6,6 @@
 #include "OmnibusTypes.h"
 
 #include "OmniDetectSphereComponent.h"
-#include "Components/ArrowComponent.h"
-#include "OmniLaneApproachCollision.h"
 #include "Components/SplineComponent.h"
 
 // Sets default values
@@ -70,7 +68,6 @@ void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
 	Super::OnConstruction(Transform);
 	SetLanePoints();
 	SetSplinesTransform();
-	SetCompTransform();
 }
 
 void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
@@ -151,29 +148,6 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 
 			LaneSpline->SetTangentAtSplinePoint(1, EndPointTangent, CoordSpace);
 		}
-	}
-}
-
-void AOmniRoadIntersectionFlat4Way::SetCompTransform()
-{
-	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
-
-	for (int i = 0; i < Debug_LaneArrows.Num(); ++i)
-	{
-		const USplineComponent* TargetLaneSpline = GetLaneSpline(i);
-		if (OB_IS_VALID(TargetLaneSpline) == false)
-			continue;
-
-		const FVector Lane_StartLoc       = TargetLaneSpline->GetLocationAtSplinePoint(0, CoordSpace);
-		const FVector Lane_StartDirection = TargetLaneSpline->GetDirectionAtSplinePoint(0, CoordSpace);
-
-		// 디버그 화살표
-		UArrowComponent* const LaneArrow = GetDebugLaneArrow(i);
-		if (OB_IS_VALID(LaneArrow) == false)
-			continue;
-
-		LaneArrow->SetRelativeLocation(Lane_StartLoc);
-		LaneArrow->SetRelativeRotation(Lane_StartDirection.Rotation());
 	}
 }
 

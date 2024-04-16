@@ -303,7 +303,7 @@ namespace OmniMath
  * ATextRenderActor를 정해진 시간동안만 월드에 스폰시킴.
  * WorldSize는 50 전후부터 보임
  */
-#if WITH_EDITOR
+#if WITH_EDITOR == 1
 
 #define TIME_LIMIT_TEXT_RENDER( SpawnPos, LifeSpan, SettingText, WorldSize )\
 {\

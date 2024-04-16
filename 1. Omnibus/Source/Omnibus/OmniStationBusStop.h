@@ -33,11 +33,11 @@ public:
 	UStaticMeshComponent* BusStopMesh;
 
 	/** 버스 감속 구간*/
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "BusStop")
 	UBoxComponent* DecelerationArea;
 
 	/** 버스 정차 위치 */
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "BusStop")
 	UBoxComponent* BusStopArea;
 
 private:

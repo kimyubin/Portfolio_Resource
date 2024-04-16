@@ -86,7 +86,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TWeakObjectPtr<AOmniLineBusRoute> MyBusRoute;
 
-	/** 현재 추적하고 있는 노선 Spline의 거리(distance). beginPlay에서 가장 가까운 inputkey로 초기화됨. */
+	/** 현재 추적하고 있는 노선 Spline의 거리(distance). beginPlay에서 가장 가까운 InputKey로 초기화됨. */
 	float CurrentRouteDistance;
 
 };

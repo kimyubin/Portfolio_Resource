@@ -8,8 +8,6 @@
 #include "OmnibusTypes.h"
 #include "OmnibusUtilities.h"
 #include "OmniDetectSphereComponent.h"
-#include "Components/ArrowComponent.h"
-#include "OmniLaneApproachCollision.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 
@@ -155,6 +153,7 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
+	USplineComponent* const MainRoadSpline = GetMainRoadSpline();
 	USplineComponent* const LaneSpline_0 = GetLaneSpline(0);
 	USplineComponent* const LaneSpline_1 = GetLaneSpline(1);
 
@@ -163,15 +162,15 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 	LaneSpline_0->bAllowDiscontinuousSpline = true; // 도착, 출발 탄젠트를 따로 제어
 	LaneSpline_1->bAllowDiscontinuousSpline = true;
 
-	const int32 RoadSplinePointsNum = GetMainRoadSpline()->GetNumberOfSplinePoints();
+	const int32 RoadSplinePointsNum = MainRoadSpline->GetNumberOfSplinePoints();
 	const double SplineSpacing      = GetRoadWidth() * 0.25; //각 스플라인 간격. 표현할 메시 너비의 1/4 지점에 각각 설치.
 
 	// 메인 RoadSpline의 각 포인트에 맞춰, 좌우 차선 업데이트.
 	for (int i = 0; i < RoadSplinePointsNum; ++i)
 	{
 		//각 포인트 위치 지정
-		const FVector RoadSplineLocation    = GetMainRoadSpline()->GetLocationAtSplinePoint(i, CoordSpace);
-		const FVector RoadSplineRightVector = GetMainRoadSpline()->GetRightVectorAtSplinePoint(i, CoordSpace);
+		const FVector RoadSplineLocation    = MainRoadSpline->GetLocationAtSplinePoint(i, CoordSpace);
+		const FVector RoadSplineRightVector = MainRoadSpline->GetRightVectorAtSplinePoint(i, CoordSpace);
 
 		const FVector Lane_00Location = RoadSplineLocation - RoadSplineRightVector * SplineSpacing;
 		const FVector Lane_01Location = RoadSplineLocation + RoadSplineRightVector * SplineSpacing;
@@ -181,11 +180,9 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 		LaneSpline_0->SetSplinePointType(i, ConvertInterpCurveModeToSplinePointType(CIM_CurveUser));
 		LaneSpline_1->SetSplinePointType(i, ConvertInterpCurveModeToSplinePointType(CIM_CurveUser));
 
-		const FInterpCurvePointVector& RoadPointCurve = GetMainRoadSpline()->SplineCurves.Position.Points[i];
-
 		// 도로 탄젠트값과 안쪽, 바깥쪽 코너에 적용할 비율
-		const FVector RoadPointArriveTangent     = RoadPointCurve.ArriveTangent;
-		const FVector RoadPointLeaveTangent      = RoadPointCurve.LeaveTangent;
+		const FVector RoadPointArriveTangent     = MainRoadSpline->GetArriveTangentAtSplinePoint(i, CoordSpace);
+		const FVector RoadPointLeaveTangent      = MainRoadSpline->GetLeaveTangentAtSplinePoint(i, CoordSpace);
 		const double RoadPointArriveTangentSize  = RoadPointArriveTangent.Size();
 		const double RoadPointLeaveTangentSize   = RoadPointLeaveTangent.Size();
 		const double InConnerArriveTangentRatio  = (RoadPointArriveTangentSize - (SplineSpacing * 2)) / RoadPointArriveTangentSize;
@@ -200,8 +197,8 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 
 		// 이전,다음 도로 Point와 현재 양쪽 차선 Point의 거리를 측정. 더 가까운 차선이 안쪽 차선.
 		// 범위 예외처리 안함. 자동 clamp됨. 넘어간 부분은 더이상 차선이 없기 때문에, 해당 방향의 탄젠트로 임의의 값이 들어가도됨.
-		const FVector PrevPointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i - 1, CoordSpace);
-		const FVector NextPointLocation = GetMainRoadSpline()->GetLocationAtSplinePoint(i + 1, CoordSpace);
+		const FVector PrevPointLocation = MainRoadSpline->GetLocationAtSplinePoint(i - 1, CoordSpace);
+		const FVector NextPointLocation = MainRoadSpline->GetLocationAtSplinePoint(i + 1, CoordSpace);
 
 		const double Lane_00PrevDist = FVector::DistSquared(Lane_00Location, PrevPointLocation);
 		const double Lane_00NextDist = FVector::DistSquared(Lane_00Location, NextPointLocation);
@@ -233,14 +230,8 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 		}
 		// else // 거리가 같거나, 이전/다음 구간이 없다면 직진. 중심도로 값과 동일하게.
 
-		FInterpCurvePointVector& Lane_00PointCurve = LaneSpline_0->SplineCurves.Position.Points.Last();
-		FInterpCurvePointVector& Lane_01PointCurve = LaneSpline_1->SplineCurves.Position.Points.Last();
-
-		Lane_00PointCurve.ArriveTangent = Lane_00ArriveTangent;
-		Lane_00PointCurve.LeaveTangent  = Lane_00LeaveTangent;
-
-		Lane_01PointCurve.ArriveTangent = Lane_01ArriveTangent;
-		Lane_01PointCurve.LeaveTangent  = Lane_01LeaveTangent;
+		LaneSpline_0->SetTangentsAtSplinePoint(i, Lane_00ArriveTangent, Lane_00LeaveTangent, CoordSpace);
+		LaneSpline_1->SetTangentsAtSplinePoint(i, Lane_01ArriveTangent, Lane_01LeaveTangent, CoordSpace);
 	}
 
 	// 1차선은 역방향이라 포인트 순서 뒤집어줌. 자동차 주행방향을 결정.
@@ -250,28 +241,17 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 	for (int i = LaneSpline_0->GetNumberOfSplinePoints() - 1; i >= 0; --i)
 	{
 		Lane_00PointsLocation.Add(LaneSpline_0->GetLocationAtSplinePoint(i, CoordSpace));
-		Lane_00PointsArriveTangent.Add(LaneSpline_0->SplineCurves.Position.Points[i].ArriveTangent);
-		Lane_00PointsLeaveTangent.Add(LaneSpline_0->SplineCurves.Position.Points[i].LeaveTangent);
+		Lane_00PointsArriveTangent.Add(LaneSpline_0->GetArriveTangentAtSplinePoint(i, CoordSpace));
+		Lane_00PointsLeaveTangent.Add(LaneSpline_0->GetLeaveTangentAtSplinePoint(i, CoordSpace));
 	}
 
 	for (int i = 0; i < LaneSpline_0->GetNumberOfSplinePoints(); ++i)
 	{
 		LaneSpline_0->SetLocationAtSplinePoint(i, Lane_00PointsLocation[i], CoordSpace);
-		LaneSpline_0->SplineCurves.Position.Points[i].LeaveTangent  = Lane_00PointsArriveTangent[i] * -1;
-		LaneSpline_0->SplineCurves.Position.Points[i].ArriveTangent = Lane_00PointsLeaveTangent[i] * -1;
+		LaneSpline_0->SetTangentsAtSplinePoint(i, Lane_00PointsLeaveTangent[i] * -1, Lane_00PointsArriveTangent[i] * -1, CoordSpace);
 	}
 	LaneSpline_0->UpdateSpline();
 	LaneSpline_1->UpdateSpline();
-
-	for (int idx = 0; idx < LaneSplines.Num(); ++idx)
-	{
-		const FVector Lane_StartLoc        = GetLaneSpline(idx)->GetLocationAtSplinePoint(0, CoordSpace);
-		const FVector Lane_StartDirection  = GetLaneSpline(idx)->GetDirectionAtSplinePoint(0, CoordSpace);
-
-		//디버그용 화살 위치 지정.
-		GetDebugLaneArrow(idx)->SetRelativeLocation(Lane_StartLoc);
-		GetDebugLaneArrow(idx)->SetRelativeRotation(Lane_StartDirection.Rotation());
-	}
 }
 
 USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
@@ -279,11 +259,11 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrev
 	if (OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
 	{
 		// 2차선은 접근 위치 번호와 진행방향이 반대
-		const int NextvRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
+		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
 		
-		if (NextvRoadIdx != INDEX_NONE)
+		if (NextRoadIdx != INDEX_NONE)
 		{
-			return GetLaneSpline(NextvRoadIdx);
+			return GetLaneSpline(NextRoadIdx);
 		}
 	}
 

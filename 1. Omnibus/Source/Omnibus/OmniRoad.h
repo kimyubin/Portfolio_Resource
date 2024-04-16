@@ -9,8 +9,6 @@
 class UOmniDetectSphereComponent;
 class AOmniStationBusStop;
 class USplineComponent;
-class UOmniLaneApproachCollision;
-class UArrowComponent;
 /**
  * 도로 최상위 객체
  */
@@ -47,7 +45,7 @@ protected:
 	 * 컴포넌트 개수를 결정하는 변수 초기화 및 다음 TArray를 해당 개수만큼 초기화.
 	 * @param InRoadSplineNum : 도로 스플라인 개수. RoadSplines
 	 * @param InRoadConnectDetectorNum : 도로 연결 감지 컴포넌트 개수. RoadConnectDetectors, ConnectedRoadsArray
-	 * @param InLaneSplineNum : 차선 개수. LaneSplines, Debug_LaneArrows
+	 * @param InLaneSplineNum : 차선 개수. LaneSplines
 	 */
 	void InitArrays(const uint8 InRoadSplineNum
 	              , const uint8 InRoadConnectDetectorNum
@@ -68,7 +66,6 @@ public:
 	
 	USplineComponent*           GetRoadSpline(const uint32 InIdx) const;
 	USplineComponent*           GetLaneSpline(const uint32 InIdx) const;
-	UArrowComponent*            GetDebugLaneArrow(const uint32 InIdx) const;
 
 	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx);
 	void AddConnectedRoadBoth(const UOmniDetectSphereComponent* InTargetDetector, const uint8 InMyAccessIdx);
@@ -136,13 +133,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TArray<USplineComponent*> LaneSplines;
-
-	/** 각 차선 진입 직전 감지용 박스 콜리전.*/
-	// UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	// TArray<UOmniLaneApproachCollision*> Lane_ApproachBoxes;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TArray<UArrowComponent*> Debug_LaneArrows;
 
 	/** 적용할 스태틱 메시. 휘어져야하기 때문에 버텍스가 충분해야함. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))

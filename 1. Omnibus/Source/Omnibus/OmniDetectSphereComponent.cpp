@@ -87,8 +87,10 @@ void UOmniDetectSphereComponent::SetRelativeTransformToSpline()
 
 FVector UOmniDetectSphereComponent::GetSplinePointInsideTangent()
 {
+	if (OB_IS_WEAK_PTR_VALID(OwnerSpline) == false)
+		return FVector::ZeroVector;
+	
 	constexpr ESplineCoordinateSpace::Type TangentSplineCoord = ESplineCoordinateSpace::World;
-
 	FVector OutTangent = FVector::ZeroVector;
 
 	switch (EnumToInt(SplinePointPosition))
@@ -112,6 +114,9 @@ FVector UOmniDetectSphereComponent::GetSplinePointInsideTangentNormal()
 
 void UOmniDetectSphereComponent::ChangeSplineTangentNormal(UOmniDetectSphereComponent* InTarget) const
 {
+	if (OB_IS_WEAK_PTR_VALID(OwnerSpline) == false)
+		return;
+
 	constexpr ESplineCoordinateSpace::Type TangentSplineCoord = ESplineCoordinateSpace::World;
 
 	// 연결된 도로의 탄젠트 노말로 자신의 탄젠트 수정.

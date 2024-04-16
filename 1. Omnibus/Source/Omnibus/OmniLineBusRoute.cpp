@@ -12,7 +12,6 @@
 #include "OmniVehicleBus.h"
 #include "Components/SplineComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
 
 AOmniLineBusRoute::AOmniLineBusRoute()
 {
@@ -135,7 +134,7 @@ void AOmniLineBusRoute::GenerateRouteRoad()
 		if (BusRouteRoads[0].Get() != BusRouteRoads.Last(0).Get())
 		{
 			const int RouteRoadsSize    = BusRouteRoads.Num();
-			const int32 UturnStartPoint = RouteSpline->GetNumberOfSplinePoints() - 1;
+			const int32 TurnStartPointIdx = RouteSpline->GetNumberOfSplinePoints() - 1;
 			
 			for(int RoadIdx = RouteRoadsSize - 1; RoadIdx >= 2 ; --RoadIdx)
 			{
@@ -150,7 +149,7 @@ void AOmniLineBusRoute::GenerateRouteRoad()
 
 				PushToRouteSpline(CurrentLane);
 			}
-			MakeUTurnRouteSpline(UturnStartPoint, UturnStartPoint + 1);
+			MakeUTurnRouteSpline(TurnStartPointIdx, TurnStartPointIdx + 1);
 		}
 		
 		// 출발한 도로 끝에서 U턴으로 닫힌 루프 구성.
@@ -180,31 +179,26 @@ void AOmniLineBusRoute::PushToRouteSpline(const USplineComponent* InAddLaneSplin
 
 	for (int AddPointIdx = 0; AddPointIdx < AddSplineNum; ++AddPointIdx)
 	{
-		const FVector AddPointLocation      = InAddLaneSpline->GetLocationAtSplinePoint(AddPointIdx, CoordSpace);
-		const FVector AddPointArriveTangent = InAddLaneSpline->GetArriveTangentAtSplinePoint(AddPointIdx, CoordSpace);
-		const FVector AddPointLeaveTangent  = InAddLaneSpline->GetLeaveTangentAtSplinePoint(AddPointIdx, CoordSpace);
-
-		RouteSpline->AddSplinePoint(AddPointLocation, CoordSpace, true);
-		const int32 BusRoutePointIdx = RouteSpline->GetNumberOfSplinePoints() - 1;
-		
-		RouteSpline->SplineCurves.Position.Points[BusRoutePointIdx].ArriveTangent = AddPointArriveTangent;
-		RouteSpline->SplineCurves.Position.Points[BusRoutePointIdx].LeaveTangent  = AddPointLeaveTangent;
-		RouteSpline->SetSplinePointType(BusRoutePointIdx, ConvertInterpCurveModeToSplinePointType(CIM_CurveUser));
+		const FVector AddPointLocation = InAddLaneSpline->GetLocationAtSplinePoint(AddPointIdx, CoordSpace);
+		FVector AddPointArriveTangent  = InAddLaneSpline->GetArriveTangentAtSplinePoint(AddPointIdx, CoordSpace);
+		FVector AddPointLeaveTangent   = InAddLaneSpline->GetLeaveTangentAtSplinePoint(AddPointIdx, CoordSpace);
 
 		// InAddLaneSpline의 양끝point의 탄젠트는 스플라인 내부 방향만 유지함.
-		FInterpCurvePointVector& CurrentPoint = RouteSpline->SplineCurves.Position.Points[BusRoutePointIdx];
 		if (AddPointIdx == 0)
 		{
 			//시작 지점은 도착 탄젠트 크기 0
-			CurrentPoint.ArriveTangent = FVector::Zero();
+			AddPointArriveTangent = FVector::Zero();
 		}
 		else if (AddPointIdx == (AddSplineNum - 1))
 		{
 			//마지막 지점은 출발 탄젠트 크기 0
-			CurrentPoint.LeaveTangent = FVector::Zero();
+			AddPointLeaveTangent = FVector::Zero();
 		}
 		
-		RouteSpline->UpdateSpline();
+		RouteSpline->AddSplinePoint(AddPointLocation, CoordSpace, true);
+		const int32 BusRoutePointIdx = RouteSpline->GetNumberOfSplinePoints() - 1;
+
+		RouteSpline->SetTangentsAtSplinePoint(BusRoutePointIdx, AddPointArriveTangent, AddPointLeaveTangent, CoordSpace);
 	}
 }
 
@@ -226,16 +220,16 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 	const double StartSectionDist   = std::abs(StartPointDist - PrevStartPointDist);
 	const double EndSectionDist     = std::abs(EndPointDist - NextEndPointDist);
 	const double AvgSectionDist     = (StartSectionDist + EndSectionDist) / 2.0;
-	const double AvgSpacingRate     = HalfLaneSpacing / AvgSectionDist;
+	const double AvgSpacingRate     = HalfLaneSpacing / AvgSectionDist; // 평균 길이 대비, 차선 간격이 차지하는 비율 
+	const double AvgBackRate        = 1 - AvgSpacingRate;               // 변화율
 	const double TurnStartPointDist = StartPointDist - (StartSectionDist * AvgSpacingRate);
 	const double TurnEndPointDist   = EndPointDist + (EndSectionDist * AvgSpacingRate);
 
-	
 	// 변경할 위치. Tangent는 변경 전 접선의 기울기
 	const FVector TurnStartPointPos     = RouteSpline->GetLocationAtDistanceAlongSpline(TurnStartPointDist, CoordSpace);
 	const FVector TurnEndPointPos       = RouteSpline->GetLocationAtDistanceAlongSpline(TurnEndPointDist, CoordSpace);
-	const FVector TurnStartPointTangent = RouteSpline->GetTangentAtDistanceAlongSpline(TurnStartPointDist, CoordSpace);
-	const FVector TurnEndPointTangent   = RouteSpline->GetTangentAtDistanceAlongSpline(TurnEndPointDist, CoordSpace);
+	const FVector TurnStartPointTangent = RouteSpline->GetTangentAtDistanceAlongSpline(TurnStartPointDist, CoordSpace) * AvgBackRate;
+	const FVector TurnEndPointTangent   = RouteSpline->GetTangentAtDistanceAlongSpline(TurnEndPointDist, CoordSpace) * AvgBackRate;
 
 	RouteSpline->SetLocationAtSplinePoint(InStartPoint, TurnStartPointPos, CoordSpace);
 	RouteSpline->SetLocationAtSplinePoint(InEndPoint, TurnEndPointPos, CoordSpace);
@@ -243,13 +237,9 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 	// 좌회전(U턴) 방향에 수직 방향(시계방향 회전. 직진방향)  
 	const FVector StartToEndNormal = (TurnEndPointPos - TurnStartPointPos).GetSafeNormal();
 	const FVector TurnTangent      = FVector(StartToEndNormal.Y, -StartToEndNormal.X, StartToEndNormal.Z) * HalfLaneSpacing * 4;
-	const double AvgBackRate       = 1 - AvgSpacingRate; // 변화율
-	
-	RouteSpline->SplineCurves.Position.Points[InStartPoint].ArriveTangent = TurnStartPointTangent * AvgBackRate;
-	RouteSpline->SplineCurves.Position.Points[InStartPoint].LeaveTangent  = -1 * TurnTangent;
-	
-	RouteSpline->SplineCurves.Position.Points[InEndPoint].ArriveTangent   = TurnTangent;
-	RouteSpline->SplineCurves.Position.Points[InEndPoint].LeaveTangent    = TurnEndPointTangent * AvgBackRate;
+
+	RouteSpline->SetTangentsAtSplinePoint(InStartPoint, TurnStartPointTangent, -1 * TurnTangent   , CoordSpace);
+	RouteSpline->SetTangentsAtSplinePoint(InEndPoint  , TurnTangent          , TurnEndPointTangent, CoordSpace);
 
 	RouteSpline->UpdateSpline();
 }

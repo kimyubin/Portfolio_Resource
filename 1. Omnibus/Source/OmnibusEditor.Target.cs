@@ -8,8 +8,8 @@ public class OmnibusEditorTarget : TargetRules
 	public OmnibusEditorTarget( TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V2;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_1;
+		DefaultBuildSettings = BuildSettingsVersion.Latest;     //V2;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Latest; //Unreal5_1;
 		ExtraModuleNames.Add("Omnibus");
 	}
 }
