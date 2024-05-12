@@ -20,13 +20,13 @@ class OMNIBUS_API AOmniRoadIntersectionFlat4Way : public AOmniRoad
 
 public:
 	AOmniRoadIntersectionFlat4Way();
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
 	virtual void BeginPlay() override;
 
 public:
 	virtual void Tick(float DeltaTime) override;
-	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION(BlueprintCallable, Category = CustomConstructionScript)
 	void SetSplinesTransform();
@@ -57,12 +57,12 @@ private:
 	ERoadDirection GetLaneDirectionByConnectedIdx(const uint32 StartLaneApproachIdx, const uint32 TargetRoadIdx) const;
 
 	/**
-	 * DetectorIdx를 바탕으로 Detector가 있어야할 위치를 Idx 형식으로 반환.
-	 * @param InDetectorIdx 찾고자하는 Detector의 index
-	 * @param OutRoadIdx 해당 Detector의 부모 도로
-	 * @param OutSplinePointIdx 해당 Detector가 부모 도로에서 있어야할 위치. SplinePointIndex
+	 * ConnectorIdx를 바탕으로 Connector가 있어야할 위치를 Idx 형식으로 반환.
+	 * @param InConnectorIdx 찾고자하는 Connector의 index
+	 * @param OutRoadIdx 해당 Connector의 부모 도로
+	 * @param OutSplinePointIdx 해당 Connector가 부모 도로에서 있어야할 위치. SplinePointIndex
 	 */
-	static void GetDetectorPositionIdx(const uint32 InDetectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx);
+	static void GetConnectorPositionIdx(const uint32 InConnectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx);
 	
 
 public:

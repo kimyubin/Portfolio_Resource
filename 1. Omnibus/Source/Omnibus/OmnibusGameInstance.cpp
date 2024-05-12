@@ -8,6 +8,7 @@
 
 #include "OmnibusPlayData.h"
 #include "OmnibusRoadManager.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 
 UOmnibusGameInstance::UOmnibusGameInstance()
@@ -35,10 +36,15 @@ void UOmnibusGameInstance::LevelInitializer()
 	if (OB_IS_VALID(GetWorld()) == false)
 		return;
 
-	FOmniTime::SetLevelStartTime_Sec();
+	if (OmnibusRoadManager.IsValid() == false)
+	{
+		const FString ErrorMsg = "Error. The RoadManager is not spawned.";
+		OB_ERROR("로드 매니저가 스폰되어져 있지 않습니다. %s", *ErrorMsg)
+		OmniMsg::Dialog(ErrorMsg);
+		UKismetSystemLibrary::QuitGame(GetWorld(), nullptr, EQuitPreference::Quit, true);
+	}
 
-	OmnibusUIsHandler  = NewObject<UOmnibusUIsHandler>(this, UOmnibusUIsHandler::StaticClass());
-	OmnibusRoadManager = GetWorld()->SpawnActor<AOmnibusRoadManager>(AOmnibusRoadManager::StaticClass());
+	OmnibusUIsHandler = NewObject<UOmnibusUIsHandler>(this, UOmnibusUIsHandler::StaticClass());
 }
 
 void UOmnibusGameInstance::LevelDisposer()
@@ -62,10 +68,15 @@ UOmnibusUIsHandler* UOmnibusGameInstance::GetOmnibusUIsHandler()
 	return OmnibusUIsHandler;
 }
 
-AOmnibusRoadManager* UOmnibusGameInstance::GetOmnibusRoadManager()
+AOmnibusRoadManager* UOmnibusGameInstance::GetOmnibusRoadManager() const
 {
-	if (OB_IS_VALID(OmnibusRoadManager) == false)
+	if (OB_IS_WEAK_PTR_VALID(OmnibusRoadManager) == false)
 		return nullptr;
 
-	return OmnibusRoadManager;
+	return OmnibusRoadManager.Get();
+}
+
+void UOmnibusGameInstance::SetOmnibusRoadManager(AOmnibusRoadManager* InRoadManager)
+{
+	OmnibusRoadManager = InRoadManager;
 }

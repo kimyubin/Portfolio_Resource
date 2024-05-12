@@ -7,6 +7,7 @@
 #include "UObject/NoExportTypes.h"
 #include "OmnibusPlayData.generated.h"
 
+class AOmniLineBusRoute;
 class AOmniVehicleBus;
 /**
  * 
@@ -25,16 +26,24 @@ public:
 	UStaticMesh*  GetPlainRoadMesh(const int& InMeshIdx) const;
 	UStaticMesh*  GetIntersectionFlat4WayRoadMesh(const int& InMeshIdx) const;
 
+	UTexture2D*   GetCityBlockIcon(ECityBlockType InCityBlockType) const;
+
+	TSubclassOf<AOmniLineBusRoute> GetOmniLineBusRouteClass() const { return OmniLineBusRouteClass; }
 	TSubclassOf<AOmniVehicleBus> GetOmniVehicleBusClass() const { return OmniVehicleBusClass; }
 
 protected:
-	// Route가 스폰할 버스 클래스
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bus Class", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Custom Class", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AOmniLineBusRoute> OmniLineBusRouteClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Custom Class", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AOmniVehicleBus> OmniVehicleBusClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Road", meta = (AllowPrivateAccess = "true"))
 	TArray<FRoadStaticMeshSet> RoadMeshSets;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CityBlock", meta = (AllowPrivateAccess = "true"))
+	TArray<FCityBlockIcon> CityBlockIcons;
+	
 	/** 현재 플레이 중인 모드. 편집, 이동 등. */
 	EOmniPlayMode PlayMode;
 	FVector3d CurrentLocation;

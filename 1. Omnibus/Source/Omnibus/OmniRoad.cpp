@@ -7,7 +7,7 @@
 
 #include "Omnibus.h"
 #include "OmnibusUtilities.h"
-#include "OmniDetectSphereComponent.h"
+#include "OmniConnectorComponent.h"
 #include "OmniStationBusStop.h"
 #include "Components/SplineComponent.h"
 
@@ -15,7 +15,6 @@ AOmniRoad::AOmniRoad()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("OmniRoadRoot"));
 
-	// PlacedMesh 기본값 세팅
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultPlacedMesh(TEXT("/Game/Meshs/RoadVertex.RoadVertex"));
 	if (DefaultPlacedMesh.Succeeded())
 		PlacedMesh = DefaultPlacedMesh.Object;
@@ -23,9 +22,30 @@ AOmniRoad::AOmniRoad()
 	InitArrays(0, 0, 0);
 }
 
+void AOmniRoad::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	DetectAllConnectedOmniRoad();
+}
+
+#if WITH_EDITOR
+void AOmniRoad::PostEditMove(bool bFinished)
+{
+	Super::PostEditMove(bFinished);
+	SetZ_Axis();
+	DetectAllConnectedOmniRoad();
+}
+#endif // WITH_EDITOR
+
 void AOmniRoad::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void AOmniRoad::Destroyed()
+{
+	RemoveAllConnectedRoadsBoth();
+	Super::Destroyed();
 }
 
 void AOmniRoad::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -40,67 +60,31 @@ void AOmniRoad::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void AOmniRoad::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	DetectAllConnectedOmniRoad();
-	
-	BoxCollisionExtent = FVector(32.0, GetRoadWidth() / 12, 32.0);
-	BoxCollisionOffset = BoxCollisionExtent.X * 1 * -1;
-}
-
-void AOmniRoad::PostEditMove(bool bFinished)
-{
-	Super::PostEditMove(bFinished);
-	SnapActorLocation();
-	DetectAllConnectedOmniRoad();
-}
-
-void AOmniRoad::BeginDestroy()
-{
-	RemoveAllConnectedRoadsBoth();
-
-	Super::BeginDestroy();
-}
-
 void AOmniRoad::DetectAllConnectedOmniRoad()
 {
 	// 현재 도로의 감지용 컴포넌트 순회. 감지된 대상 도로를 찾음.
-	for (UOmniDetectSphereComponent* const Detector : RoadConnectDetectors)
+	for (UOmniConnectorComponent* const Connector : RoadConnectors)
 	{
-		if (OB_IS_VALID(Detector) == false)
+		if (OB_IS_VALID(Connector) == false)
 			continue;
 
-		DetectOmniRoad(Detector);
+		DetectOmniRoad(Connector);
 	}
 }
 
-void AOmniRoad::SnapActorLocation()
+void AOmniRoad::InitArrays(const uint8 InRoadSplineNum, const uint8 InRoadConnectorNum, const uint8 InLaneSplineNum)
 {
-	FVector TempActorLocation = GetActorLocation();
-	if (TempActorLocation.Z != 0.0)
-	{
-		OB_LOG_STR("Note. Locking to z-axis 0.0")
-		TempActorLocation.Z = 0.0;
-	}
-	
-	SetActorLocation(OmniMath::RoundHalfToEvenVector(TempActorLocation, FOmniConst::Unit_Length));
-}
-
-
-void AOmniRoad::InitArrays(const uint8 InRoadSplineNum, const uint8 InRoadConnectDetectorNum, const uint8 InLaneSplineNum)
-{
-	RoadSplineNum          = InRoadSplineNum;
-	RoadConnectDetectorNum = InRoadConnectDetectorNum;
-	LaneSplineNum          = InLaneSplineNum;
+	RoadSplineNum    = InRoadSplineNum;
+	RoadConnectorNum = InRoadConnectorNum;
+	LaneSplineNum    = InLaneSplineNum;
 
 	ConnectedRoadsArray.Empty();
-	RoadConnectDetectors.Empty();
+	RoadConnectors.Empty();
 	RoadSplines.Empty();
 	LaneSplines.Empty();
 
-	ConnectedRoadsArray.SetNum(RoadConnectDetectorNum);
-	RoadConnectDetectors.SetNum(RoadConnectDetectorNum);
+	ConnectedRoadsArray.SetNum(RoadConnectorNum);
+	RoadConnectors.SetNum(RoadConnectorNum);
 	RoadSplines.SetNum(RoadSplineNum);
 	LaneSplines.SetNum(LaneSplineNum);
 }
@@ -109,7 +93,7 @@ void AOmniRoad::InitRoadSpline(const uint32 InIdx)
 {
 	check(RoadSplines.IsValidIndex(InIdx))
 
-	const FName RoadSplineName            = OmniTool::ConcatStrInt("RoadSpline", InIdx);
+	const FName RoadSplineName            = OmniStr::ConcatStrInt("RoadSpline", InIdx);
 	USplineComponent* const CurRoadSpline = CreateDefaultSubobject<USplineComponent>(RoadSplineName);
 
 	if (OB_IS_VALID(CurRoadSpline) == false)
@@ -119,21 +103,22 @@ void AOmniRoad::InitRoadSpline(const uint32 InIdx)
 	CurRoadSpline->SetupAttachment(RootComponent);
 }
 
-void AOmniRoad::InitRoadConnectDetector(const uint32 InIdx, USplineComponent* InOwnerRoadSpline, const uint32 InSplinePointIdx)
+void AOmniRoad::InitRoadConnector(const uint32 InIdx, USplineComponent* InOwnerRoadSpline, const uint32 InSplinePointIdx)
 {
-	check(RoadConnectDetectors.IsValidIndex(InIdx))
+	check(RoadConnectors.IsValidIndex(InIdx))
 	if (OB_IS_VALID(InOwnerRoadSpline) == false)
 		return;
 
-	const FName ConnectorName                     = OmniTool::ConcatStrInt("RoadConnectDetector", InIdx);
-	UOmniDetectSphereComponent* const CurDetector = CreateDefaultSubobject<UOmniDetectSphereComponent>(ConnectorName);
+	const FName ConnectorName = OmniStr::ConcatStrInt("RoadConnector", InIdx);
+	UOmniConnectorComponent* const CurConnector = CreateDefaultSubobject<UOmniConnectorComponent>(ConnectorName);
 
-	if (OB_IS_VALID(CurDetector) == false)
+	if (OB_IS_VALID(CurConnector) == false)
 		return;
 
-	RoadConnectDetectors[InIdx] = CurDetector;
-	CurDetector->SetupAttachment(InOwnerRoadSpline);
-	CurDetector->SetOwnerOmniRoadAndSpline(this, InOwnerRoadSpline, InSplinePointIdx, InIdx);
+	RoadConnectors[InIdx] = CurConnector;
+	CurConnector->SetupAttachment(InOwnerRoadSpline);
+	CurConnector->SetOwnerOmniRoadAndSpline(this, InOwnerRoadSpline, InSplinePointIdx, InIdx);
+	CurConnector->SetCollisionProfileName(EOmniCollisionProfile::RoadConnector);
 }
 
 void AOmniRoad::InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoadSpline)
@@ -142,7 +127,7 @@ void AOmniRoad::InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoad
 	if (OB_IS_VALID(InOwnerRoadSpline) == false)
 		return;
 
-	const FName LaneSplineName            = OmniTool::ConcatStrInt("LaneSpline", InIdx);
+	const FName LaneSplineName            = OmniStr::ConcatStrInt("LaneSpline", InIdx);
 	USplineComponent* const CurLaneSpline = CreateDefaultSubobject<USplineComponent>(LaneSplineName);
 	if (OB_IS_VALID(CurLaneSpline) == false)
 		return;
@@ -181,19 +166,19 @@ USplineComponent* AOmniRoad::GetLaneSpline(const uint32 InIdx) const
 
 void AOmniRoad::AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx)
 {
-	if (OB_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
+	if (OB_IS_VALID(InRoad) && (InRoad != this))
 	{
 		if (ConnectedRoadsArray.IsValidIndex(InAccessIdx))
 			ConnectedRoadsArray[InAccessIdx] = InRoad;
 		else
-			OB_LOG_STR("InAccessIdx : invalid value")
+			OB_LOG("InAccessIdx : invalid value")
 	}
 }
 
-void AOmniRoad::AddConnectedRoadBoth(const UOmniDetectSphereComponent* InTargetDetector, const uint8 InMyAccessIdx)
+void AOmniRoad::AddConnectedRoadBoth(const UOmniConnectorComponent* InTargetConnector, const uint8 InMyAccessIdx)
 {
-	AOmniRoad* const TargetRoad = InTargetDetector->GetOwnerOmniRoad();
-	const uint8 TargetAccessIdx = InTargetDetector->GetAccessPointIdx();
+	AOmniRoad* const TargetRoad = InTargetConnector->GetOwnerOmniRoad();
+	const uint8 TargetAccessIdx = InTargetConnector->GetAccessPointIdx();
 	if (OB_IS_VALID(TargetRoad))
 	{
 		AddConnectedRoadSingle(TargetRoad, InMyAccessIdx);
@@ -251,81 +236,98 @@ void AOmniRoad::RemoveAllConnectedRoadsBoth()
 	ConnectedRoadsArray.Empty();
 }
 
-int32 AOmniRoad::FindConnectedRoadIdx(AOmniRoad* InRoad) const
+AOmniStationBusStop* AOmniRoad::FindBusStopByID(const uint64 InId)
 {
-	return ConnectedRoadsArray.Find(InRoad);
+	const TWeakObjectPtr<AOmniStationBusStop>* FindPtr = OwnedBusStops.FindByPredicate([InId](const TWeakObjectPtr<AOmniStationBusStop>& InBusStop) -> bool
+	{
+		if (InBusStop.IsValid())
+			return (InBusStop.Get()->GetOmniID() == InId);
+		return false;
+	});
+	
+	if (FindPtr == nullptr)
+		return nullptr;
+
+	return FindPtr->Get();
 }
 
-bool AOmniRoad::HasOwnedBusStop(const uint64 InId)
+int32 AOmniRoad::FindBusStopIdx(AOmniStationBusStop* InBusStop) const
 {
-	const AOmniStationBusStop* FindResult = OmniContainer::TMap_Find(OwnedBusStops, InId);
-
-	return (FindResult != nullptr);
+	if(IsValid(InBusStop) == false)
+		return INDEX_NONE;
+	return OwnedBusStops.Find(InBusStop);
 }
 
-void AOmniRoad::AddOwnedBusStop(AOmniStationBusStop* InBusStop)
+bool AOmniRoad::HasBusStopByID(const uint64 InId)
+{
+	return (FindBusStopByID(InId) != nullptr);
+}
+
+bool AOmniRoad::HasBusStop(AOmniStationBusStop* InBusStop) const
+{
+	return FindBusStopIdx(InBusStop) != INDEX_NONE;
+}
+
+void AOmniRoad::AddBusStop(AOmniStationBusStop* InBusStop)
 {
 	if (OB_IS_VALID(InBusStop))
 	{
-		InBusStop->SetOwnerOmniRoad(this);
-		OmniContainer::TMap_Emplace(OwnedBusStops, InBusStop->GetOmniID(), InBusStop);
+		if (HasBusStop(InBusStop) == false)
+			OwnedBusStops.Emplace(InBusStop);
 	}
 }
 
-void AOmniRoad::RemoveOwnedBusStop(const uint64 InId)
+void AOmniRoad::RemoveBusStopByID(const uint64 InId)
 {
-	OwnedBusStops.Remove(InId);
+	AOmniStationBusStop* FindBusStop = FindBusStopByID(InId);
+	RemoveBusStop(FindBusStop);
 }
 
-void AOmniRoad::RemoveOwnedBusStop(AOmniStationBusStop* InBusStop)
+void AOmniRoad::RemoveBusStop(AOmniStationBusStop* InBusStop)
 {
-	if (OB_IS_VALID(InBusStop))
-		RemoveOwnedBusStop(InBusStop->GetOmniID());
+	if (IsValid(InBusStop))
+	{
+		// 해당 버스 정류장 삭제할 때, 유효하지 않은 배열 요소도 같이 제거.
+		OwnedBusStops.RemoveAll([&InBusStop](TWeakObjectPtr<AOmniStationBusStop>& Element)
+		{
+			return (Element == InBusStop) || (Element.IsValid() == false);
+		});
+	}
 }
 
-AOmniStationBusStop* AOmniRoad::FindOwnedBusStop(const uint64 InId)
+void AOmniRoad::RemoveInvalidBusStop()
 {
-	return OmniContainer::TMap_Find(OwnedBusStops, InId);
+	// 유효하지 않거나, 연결되지 않은 버스 정류장 제거
+	OwnedBusStops.RemoveAll([this](TWeakObjectPtr<AOmniStationBusStop>& Element)
+	{
+		if (Element.IsValid() == false)
+			return true;
+		if (Element.Get()->GetOwnerOmniRoad() != this)
+			return true;
+		return false;
+	});
+}
+
+int32 AOmniRoad::FindConnectedRoadIdx(AOmniRoad* InRoad) const
+{
+	if (IsValid(InRoad) == false)
+		return INDEX_NONE;
+
+	return ConnectedRoadsArray.Find(InRoad);
 }
 
 void AOmniRoad::FindPath(AOmniRoad* InStartRoad, AOmniRoad* InEndRoad, AOmniRoad* PrevRoad, TArray<AOmniRoad*>& OutPath)
 {
 }
 
-AOmniRoad* AOmniRoad::GetRandomConnectedRoad(AOmniRoad* PrevRoad)
-{
-	if (PrevRoad == nullptr)
-		return ConnectedRoadsArray[0];
-
-	std::random_device deviceSeed;
-	std::mt19937 rdEngine(deviceSeed());
-	std::uniform_int_distribution<int> rdRange(0, ConnectedRoadsArray.Num() - 1);
-
-	const int32 PrevRoadIdx = FindConnectedRoadIdx(PrevRoad);
-	int32 RdIdx(0);
-	constexpr int LoopLimit = 1000;
-	for (int i = 0; i < LoopLimit; ++i)
-	{
-		RdIdx = rdRange(rdEngine);
-		if ((RdIdx != PrevRoadIdx) && IsValid(ConnectedRoadsArray[RdIdx]))
-			break;
-	}
-
-	return ConnectedRoadsArray[RdIdx];
-}
-
 AOmniRoad* AOmniRoad::GetRandomNextRoad(AOmniRoad* InPrevRoad)
 {
 	const int32 PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
-
-	std::random_device deviceSeed;
-	std::mt19937 rdEngine(deviceSeed());
-	std::uniform_int_distribution<int> rdRange(0, ConnectedRoadsArray.Num() - 1);
-
+	
 	constexpr int LoopLimit = 1000;
 	for (int i = 0; i < LoopLimit; ++i)
 	{
-		const int32 RdIdx = rdRange(rdEngine);
+		const int32 RdIdx = OmniMath::GetIntRandom(0, ConnectedRoadsArray.Num() - 1);
 		if ((RdIdx != PrevRoadIdx) && ConnectedRoadsArray.IsValidIndex(RdIdx) && IsValid(ConnectedRoadsArray[RdIdx]))
 			return ConnectedRoadsArray[RdIdx];
 	}
@@ -341,13 +343,14 @@ double AOmniRoad::GetRoadWidth()
 	return OmniMath::GetBoxWidth(PlaceMeshBox);
 }
 
-UOmniDetectSphereComponent* AOmniRoad::DetectOmniRoad(UOmniDetectSphereComponent* const Detector)
+UOmniConnectorComponent* AOmniRoad::DetectOmniRoad(UOmniConnectorComponent* const Connector)
 {
-	const uint8 AccessPointIdx = Detector->GetAccessPointIdx();
-	UClass* const TargetClass  = Detector->StaticClass();
+	const uint8 AccessPointIdx = Connector->GetAccessPointIdx();
+	UClass* const TargetClass  = Connector->StaticClass();
 
 	//겹치는 컴포넌트 추적.
-	TArray<UPrimitiveComponent*> OverlappingComps = Detector->GetOverlapComps(TargetClass);
+	TArray<UPrimitiveComponent*> OverlappingComps;
+	FOmniStatics::GetOverlapComps(Connector, TargetClass, OverlappingComps);
 	UPrimitiveComponent** FindPtr = OverlappingComps.FindByPredicate([TargetClass](const UPrimitiveComponent* InOverlap) -> bool
 	{
 		return InOverlap->IsA(TargetClass);
@@ -360,7 +363,39 @@ UOmniDetectSphereComponent* AOmniRoad::DetectOmniRoad(UOmniDetectSphereComponent
 		return nullptr;
 	}
 
-	UOmniDetectSphereComponent* DetectedTargetSphere = Cast<UOmniDetectSphereComponent>(*FindPtr);
-	AddConnectedRoadBoth(DetectedTargetSphere, Detector->GetAccessPointIdx());
-	return DetectedTargetSphere;
+	UOmniConnectorComponent* DetectedTargetConnector = Cast<UOmniConnectorComponent>(*FindPtr);
+	AddConnectedRoadBoth(DetectedTargetConnector, Connector->GetAccessPointIdx());
+	return DetectedTargetConnector;
+}
+
+bool AOmniRoad::FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* InTargetClass, const FVector& InTargetPos, AOmniRoad*& OutNearRoad
+                                     , uint32& OutLaneIdx)
+{
+	bool IsFind = false;
+
+	float DistanceFromNearest = TNumericLimits<float>::Max();
+	for (auto& InActor : InActors)
+	{
+		if (IsValid(InActor) && InActor->IsA(InTargetClass))
+		{
+			AOmniRoad* Road     = Cast<AOmniRoad>(InActor);
+			const uint8 LaneNum = Road->GetLaneSplineNum();
+			for (int idx = 0; idx < LaneNum; ++idx)
+			{
+				const USplineComponent* Lane = Road->GetLaneSpline(idx);
+				FVector ClosestSplineLoc     = Lane->FindLocationClosestToWorldLocation(InTargetPos, ESplineCoordinateSpace::World);
+				const float DistanceFromLane = (InTargetPos - ClosestSplineLoc).SizeSquared();
+				if (DistanceFromLane < DistanceFromNearest)
+				{
+					DistanceFromNearest = DistanceFromLane;
+
+					OutNearRoad = Road;
+					OutLaneIdx  = idx;
+					IsFind      = true;
+				}
+			}
+		}
+	}
+
+	return IsFind;
 }

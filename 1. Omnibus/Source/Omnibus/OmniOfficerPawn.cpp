@@ -26,7 +26,6 @@ AOmniOfficerPawn::AOmniOfficerPawn()
 	MovementComponent->UpdatedComponent       = RootComponent;
 	MovementComponent->MaxSpeed               = 1800.f;
 
-
 	// 카메라 암 구성
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -43,11 +42,11 @@ AOmniOfficerPawn::AOmniOfficerPawn()
 	PlayerCamera->bUsePawnControlRotation = false; // 카메라 암이 회전할 때 회전 방지
 
 	ZoomSpeed     = 10.f;
-	MaxZoomStep   = 14;
-	StartZoomStep = 9;
+	MaxZoomStep   = 17;
+	StartZoomStep = 11;
 
-	MaxOrthoWidth = 3800.f;
-	MinOrthoWidth = 1000.f;
+	MaxOrthoWidth = 48000.f;
+	MinOrthoWidth = 4500.f;
 	InitSettings();
 
 	bCameraZooming                = false;
@@ -58,19 +57,38 @@ AOmniOfficerPawn::AOmniOfficerPawn()
 	DragStartMouseLocation        = FVector2D::ZeroVector;
 }
 
+void AOmniOfficerPawn::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	InitSettings();
+	
+}
+
+void AOmniOfficerPawn::InitSettings()
+{
+	CurrentZoomStep = FMath::Clamp(StartZoomStep, 0, MaxZoomStep);
+
+	// 줌단계만큼의 제곱근을 구함. MinOrthoWidth * (StepIntervalRate^n(0~MaxZoomStep)) = MaxOrthoWidth
+	const float StepIntervalRate = pow(MaxOrthoWidth / MinOrthoWidth, 1.0 / static_cast<float>(MaxZoomStep));
+
+	OrthoWidths.clear();
+	OrthoWidths.reserve(MaxZoomStep);
+	OrthoWidths.push_back(MinOrthoWidth);
+
+	for (int step = 0; step < MaxZoomStep; ++step)
+	{
+		OrthoWidths.push_back(OrthoWidths.back() * StepIntervalRate);
+	}
+	
+	PlayerCamera->OrthoWidth = GetDesiredOrthoWidth();
+}
+
 void AOmniOfficerPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	GetWorld()->GetFirstPlayerController()->Possess(this);
 	SetActorRotation(FRotator(0.0, -90.0, 0.0));
-	InitSettings();	
-}
-
-void AOmniOfficerPawn::InitSettings()
-{
-	CurrentZoomStep          = FMath::Clamp(StartZoomStep, 0, MaxZoomStep);
-	UnitOrthoWidth           = (MaxOrthoWidth - MinOrthoWidth) / MaxZoomStep;
-	PlayerCamera->OrthoWidth = GetDesiredOrthoWidth();
+	
 }
 
 void AOmniOfficerPawn::Tick(float DeltaTime)
@@ -132,14 +150,14 @@ void AOmniOfficerPawn::ZoomCameraInput(const FInputActionValue& InputValue)
 	if (OB_IS_VALID(Controller))
 	{
 		//상하 제한에 걸리면 줌 실행안함.
-		if (AddZoomStep(Axis))
+		if (AddZoomStepByAxis(Axis))
 		{
 			bCameraZooming             = true;
 			bUsingMouseWheelCameraZoom = true;
 
 			//마우스 휠업다운인 경우 커서 중심으로 줌하기 위해 커서 위치 저장.
 			FHitResult Result;
-			GetController<AOmnibusPlayerController>()->GetHitResultUnderCursor(ECC_Visibility, false, Result);
+			GetController<AOmnibusPlayerController>()->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), false, Result);
 			PrevScrollUnderCursorLocation = OmniMath::MakeFVector2D(Result.Location);
 		}
 	}
@@ -175,7 +193,7 @@ void AOmniOfficerPawn::UpdateCameraZoom(const float DeltaTime)
 
 float AOmniOfficerPawn::GetDesiredOrthoWidth() const
 {
-	return MinOrthoWidth + UnitOrthoWidth * CurrentZoomStep;
+	return OrthoWidths[FMath::Clamp(CurrentZoomStep, 0, OrthoWidths.size() - 1)];
 }
 
 bool AOmniOfficerPawn::AddZoomStep(const int InZoomStepDelta)
@@ -202,7 +220,7 @@ bool AOmniOfficerPawn::AddZoomStep(const int InZoomStepDelta)
 	return false;
 }
 
-bool AOmniOfficerPawn::AddZoomStep(const float InZoomStepAxis)
+bool AOmniOfficerPawn::AddZoomStepByAxis(const float InZoomStepAxis)
 {
 	if (InZoomStepAxis < 0)
 		return AddZoomStep(-1);

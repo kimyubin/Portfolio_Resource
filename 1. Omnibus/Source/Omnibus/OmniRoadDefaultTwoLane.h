@@ -19,6 +19,9 @@ class OMNIBUS_API AOmniRoadDefaultTwoLane : public AOmniRoad
 
 public:
 	AOmniRoadDefaultTwoLane();
+#if WITH_EDITOR
+	virtual void PostEditMove(bool bFinished) override;
+#endif // WITH_EDITOR
 
 protected:
 	virtual void BeginPlay() override;
@@ -26,7 +29,6 @@ protected:
 
 public:
 	virtual void Tick(float DeltaTime) override;
-	virtual void PostEditMove(bool bFinished) override;
 
 	/**
 	 * 이웃하는 도로 감지 및 추가.
@@ -54,6 +56,4 @@ public:
 	UFUNCTION()
 	USplineComponent* GetMainRoadSpline() const;
 
-	UFUNCTION(BlueprintCallable)
-	int GetSplinePointLastIdx();
 };

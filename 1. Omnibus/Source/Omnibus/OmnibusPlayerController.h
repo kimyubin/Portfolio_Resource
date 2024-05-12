@@ -37,6 +37,9 @@ public:
 	void Drag(const FInputActionValue& InputValue);
 
 	UFUNCTION(BlueprintCallable)
+	void ToggleRouteVisibility(const FInputActionValue& InputValue);
+	
+	UFUNCTION(BlueprintCallable)
 	void SpawnAndTrackPreviewBusStop(EBusStopType PreviewType);
 
 	UFUNCTION(BlueprintCallable)

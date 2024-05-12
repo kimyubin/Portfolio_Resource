@@ -2,6 +2,8 @@
 
 #include "OmniVehicleBus.h"
 
+#include <chrono>
+
 #include "OmniAICtrlBus.h"
 #include "Omnibus.h"
 #include "OmnibusTypes.h"
@@ -24,17 +26,20 @@ AOmniVehicleBus::AOmniVehicleBus()
 	PawnMovement = CreateDefaultSubobject<USpectatorPawnMovement>(TEXT("MovementComponent"));
 	PawnMovement->UpdatedComponent  = RootComponent;
 	PawnMovement->bConstrainToPlane = true;
-	PawnMovement->MaxSpeed          = 1200.0;
-	PawnMovement->Acceleration      = 1200.0;
+	PawnMovement->MaxSpeed          = 900.0;
+	PawnMovement->Acceleration      = 900.0;
 	PawnMovement->TurningBoost      = 16.0;
 	PawnMovement->SetPlaneConstraintAxisSetting(EPlaneConstraintAxisSetting::Z);
 
 	BusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BusMesh"));
 	BusMesh->SetupAttachment(RootComponent);
 	BusMesh->SetCanEverAffectNavigation(false);
+	BusMesh->SetCollisionProfileName(EOmniCollisionProfile::BusDetector);
 
 	ForwardSensingBoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("Sensor"));
 	ForwardSensingBoxComponent->SetupAttachment(RootComponent);
+	ForwardSensingBoxComponent->SetRelativeLocation(FVector(150, 0.0, 0.0));
+	ForwardSensingBoxComponent->SetCollisionProfileName(EOmniCollisionProfile::BusDetector);
 	
 	AIControllerClass = AOmniAICtrlBus::StaticClass();
 	AutoPossessAI     = EAutoPossessAI::PlacedInWorldOrSpawned;
@@ -43,6 +48,16 @@ AOmniVehicleBus::AOmniVehicleBus()
 	MyBusRoute           = nullptr;
 	CurrentRouteDistance = 0.0f;
 	RouteTargetMoveSpeed = PawnMovement->MaxSpeed;
+}
+
+void AOmniVehicleBus::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	if(ForwardSensingBoxComponent)
+	{
+		const double BoxDistance = SteeringDistance + ForwardSensingBoxComponent->GetScaledBoxExtent().X;
+		ForwardSensingBoxComponent->SetRelativeLocation(FVector(BoxDistance, 0.0, 0.0));
+	}
 }
 
 void AOmniVehicleBus::BeginPlay()
@@ -88,6 +103,8 @@ void AOmniVehicleBus::DriveToDestination(const float DeltaTime)
 	AddActorLocalRotation(GetRotationToTarget(TargetPoint));
 	SetBusSpeed(TargetPoint);
 	AddMovementInput(GetActorForwardVector());
+	
+	NowBusSpeed = PawnMovement->Velocity.Length();
 }
 
 FVector AOmniVehicleBus::GetTargetPointFromRouteSpline(const float DeltaTime)
@@ -99,17 +116,27 @@ FVector AOmniVehicleBus::GetTargetPointFromRouteSpline(const float DeltaTime)
 
 	const USplineComponent* SplineComp = MyBusRoute->GetRouteSpline();
 
-	const float VelocityFactor = DeltaTime * RouteTargetMoveSpeed;
-	const float SplineLen      = SplineComp->GetSplineLength();
-	CurrentRouteDistance       = OmniMath::CircularNumF(SplineLen, CurrentRouteDistance + VelocityFactor);
-	const FVector TargetPoint  = SplineComp->GetLocationAtDistanceAlongSpline(CurrentRouteDistance, CoordSpace);
+	// 진행방향 변화량 각도 계산
+	const float PrevDist      = CurrentRouteDistance;
+	const FVector PrevTangent = SplineComp->GetTangentAtDistanceAlongSpline(PrevDist, CoordSpace);
+	const FVector NextTangent = SplineComp->GetTangentAtDistanceAlongSpline(PrevDist + SteeringDistance, CoordSpace);
+	const float DeltaRadian   = acosf(FVector::DotProduct(PrevTangent.GetSafeNormal(), NextTangent.GetSafeNormal()));
 
-	UKismetSystemLibrary::DrawDebugSphere(this, FVector(TargetPoint.X, TargetPoint.Y, 10), 12.f, 12, FLinearColor::Red, 1.5f, 5.f);
+	// 각도가 크면 더 느리게 움직임. 180도 == PI rad
+	const float ChangeRateFactor = (1.0 - OmniMath::CircularNumF(1.0, abs(DeltaRadian) / UE_PI)) * 0.7;
+	const float VelocityFactor   = RouteTargetMoveSpeed * DeltaTime * (ChangeRateFactor + 0.3);
+	const float SplineLen        = SplineComp->GetSplineLength();
+	const float NextDist         = OmniMath::CircularNumF(SplineLen, CurrentRouteDistance + VelocityFactor);
+	const FVector TargetPoint    = SplineComp->GetLocationAtDistanceAlongSpline(NextDist, CoordSpace);
+
+	NowRouteSpeed        = (NextDist - PrevDist) / DeltaTime;
+	CurrentRouteDistance = NextDist;
+	// UKismetSystemLibrary::DrawDebugSphere(this, FVector(TargetPoint.X, TargetPoint.Y, 10), 12.f, 12, FLinearColor::Red, 1.5f, 5.f);
 
 	return TargetPoint;
 }
 
-FRotator AOmniVehicleBus::GetRotationToTarget(const FVector InTargetPos)
+FRotator AOmniVehicleBus::GetRotationToTarget(const FVector InTargetPos) const
 {
 	const FVector  ActLoc    = GetActorLocation();
 	const FRotator ActRot    = GetActorRotation();
@@ -129,14 +156,14 @@ void AOmniVehicleBus::SetBusSpeed(const FVector InTargetPos)
 	const double SquaredSteeringDist = SteeringDistance * SteeringDistance;
 	const double DistanceSquaredRate = SquaredLen / SquaredSteeringDist;
 
-	// 거리 비율 110% 초과면 110%로 가속, 90% 미만이면 거리비례로 감속.  
+	// 거리 비율 110% 초과면 110%로 가속, 90% 미만이면 거리비례로 감속.
 	double SpeedFactor = 1;
 	if (DistanceSquaredRate > 1.21)
-		SpeedFactor = 1.1;
+		SpeedFactor = 1.05;
 	else if (DistanceSquaredRate < 0.81)
-		SpeedFactor = sqrt(DistanceSquaredRate);
-	
-	SetDriveMaxSpeed(SpeedFactor * RouteTargetMoveSpeed);
+		SpeedFactor = /*sqrt*/(DistanceSquaredRate / 2.0);
+
+	SetDriveMaxSpeed(FMath::Clamp(NowRouteSpeed * SpeedFactor, 0.0, RouteTargetMoveSpeed));
 }
 
 void AOmniVehicleBus::SetDriveMaxSpeed(const double InMaxSpeed /*= 1200.0*/)
@@ -145,7 +172,7 @@ void AOmniVehicleBus::SetDriveMaxSpeed(const double InMaxSpeed /*= 1200.0*/)
 		PawnMovement->MaxSpeed = InMaxSpeed;
 }
 
-void AOmniVehicleBus::SetDriveAcceleration(const double InAcceleration /*= 4000.0*/)
+void AOmniVehicleBus::SetDriveAcceleration(const double InAcceleration /*= 1200.0*/)
 {
 	if (OB_IS_VALID(PawnMovement))
 		PawnMovement->Acceleration = InAcceleration;

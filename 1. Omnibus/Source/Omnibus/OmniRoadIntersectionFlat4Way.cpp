@@ -5,7 +5,7 @@
 #include "OmnibusUtilities.h"
 #include "OmnibusTypes.h"
 
-#include "OmniDetectSphereComponent.h"
+#include "OmniConnectorComponent.h"
 #include "Components/SplineComponent.h"
 
 // Sets default values
@@ -21,12 +21,12 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 		InitRoadSpline(i);
 	}
 
-	for (int DetectorIdx = 0; DetectorIdx < RoadConnectDetectorNum; ++DetectorIdx)
+	for (int ConnectorIdx = 0; ConnectorIdx < RoadConnectorNum; ++ConnectorIdx)
 	{
 		uint32 RoadIdx;
 		uint32 RoadSplinePointIdx;
 		
-		GetDetectorPositionIdx(DetectorIdx, RoadIdx, RoadSplinePointIdx);
+		GetConnectorPositionIdx(ConnectorIdx, RoadIdx, RoadSplinePointIdx);
 
 		if (RoadSplines.IsValidIndex(RoadIdx) == false)
 		{
@@ -35,7 +35,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 		}
 		
 		USplineComponent* RoadSpline = RoadSplines[RoadIdx];
-		InitRoadConnectDetector(DetectorIdx, RoadSpline, RoadSplinePointIdx);
+		InitRoadConnector(ConnectorIdx, RoadSpline, RoadSplinePointIdx);
 	}
 
 	for (int i = 0; i < LaneSplineNum; ++i)
@@ -43,12 +43,19 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 		InitLaneSpline(i, GetRoadSpline(i / 6));
 	}
 
-	const FName Mesh = OmniTool::ConcatStrInt("Flat4WayMesh", 0);
+	const FName Mesh = OmniStr::ConcatStrInt("Flat4WayMesh", 0);
 	Flat4WayMesh     = CreateDefaultSubobject<UStaticMeshComponent>(Mesh);
 	Flat4WayMesh->SetupAttachment(RootComponent);
+}
 
+void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
 	if (OB_IS_VALID(PlacedMesh))
 		Flat4WayMesh->SetStaticMesh(PlacedMesh);
+	
+	SetLanePoints();
+	SetSplinesTransform();
 }
 
 // Called when the game starts or when spawned
@@ -61,13 +68,6 @@ void AOmniRoadIntersectionFlat4Way::BeginPlay()
 void AOmniRoadIntersectionFlat4Way::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-}
-
-void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	SetLanePoints();
-	SetSplinesTransform();
 }
 
 void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
@@ -100,10 +100,10 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 	RoadSpline_1->SetTangentAtSplinePoint(0, X_BasePoint, CoordSpace);
 	RoadSpline_1->SetTangentAtSplinePoint(1, X_BasePoint, CoordSpace);
 
-	for (UOmniDetectSphereComponent* const Detector : RoadConnectDetectors)
+	for (UOmniConnectorComponent* const Connector : RoadConnectors)
 	{
-		if (OB_IS_VALID(Detector))
-			Detector->SetRelativeTransformToSpline();
+		if (OB_IS_VALID(Connector))
+			Connector->SetRelativeTransformToSpline();
 	}
 
 	const uint32 LaneMaxIdx = LaneSplineNum / 3; // 12/3 = 4
@@ -219,7 +219,7 @@ FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensi
 
 USplineComponent* AOmniRoadIntersectionFlat4Way::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
-	if (OB_IS_VALID(InNextTargetRoad))
+	if ( OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
 	{
 		const int PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
 		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
@@ -240,7 +240,7 @@ void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, co
 		if (ConnectedRoadsArray.IsValidIndex(InAccessIdx))
 			ConnectedRoadsArray[InAccessIdx] = InRoad;
 		else
-			OB_LOG_STR("InAccessIdx : invalid value")
+			OB_LOG("InAccessIdx : invalid value")
 	}
 }
 
@@ -269,17 +269,17 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	return Direction;
 }
 
-void AOmniRoadIntersectionFlat4Way::GetDetectorPositionIdx(const uint32 InDetectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx)
+void AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const uint32 InConnectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx)
 {
 	/**
-     * RoadConnectDetectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
+     * RoadConnectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
      * Idx가 시계방향이 아니라, 0 3 1 2 순서라서 변환해야함.
      *    0          0           0-0
      * 3     1 => 2     3 => 1-0     1-1
      *    2          1           0-1
 	 */
-	uint32 RoadPointIdx = InDetectorIdx;
-	switch (InDetectorIdx)
+	uint32 RoadPointIdx = InConnectorIdx;
+	switch (InConnectorIdx)
 	{
 		case 0: RoadPointIdx = 0; break;
 		case 1: RoadPointIdx = 3; break;

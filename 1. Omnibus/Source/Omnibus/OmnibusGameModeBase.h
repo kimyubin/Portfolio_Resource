@@ -17,6 +17,7 @@ class OMNIBUS_API AOmnibusGameModeBase : public AGameModeBase
 
 public:
 	AOmnibusGameModeBase();
+	virtual void StartPlay() override;
 
 protected:
 	virtual void BeginPlay() override;

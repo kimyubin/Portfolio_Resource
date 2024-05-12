@@ -3,7 +3,7 @@
 
 #include "OmnibusGameModeBase.h"
 
-#include "OmnibusGameInstance.h"
+#include "Omnibus.h"
 #include "OmnibusPlayerController.h"
 #include "OmniOfficerPawn.h"
 #include "Blueprint/UserWidget.h"
@@ -15,10 +15,14 @@ AOmnibusGameModeBase::AOmnibusGameModeBase()
 	CurrentWidget         = nullptr;
 }
 
+void AOmnibusGameModeBase::StartPlay()
+{
+	Super::StartPlay();
+}
+
 void AOmnibusGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
-	GetGameInstance<UOmnibusGameInstance>()->LevelInitializer();
 
 	ChangeMenuWidget(StartWidgetClass);
 }

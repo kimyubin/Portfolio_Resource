@@ -6,30 +6,44 @@
 #include "Omnibus.h"
 #include "OmnibusGameInstance.h"
 #include "OmnibusPlayData.h"
+#include "OmnibusRoadManager.h"
 #include "OmnibusUtilities.h"
 #include "OmniRoad.h"
 #include "OmniRoadDefaultTwoLane.h"
+#include "OmniStationBusStop.h"
 #include "OmniVehicleBus.h"
 #include "Components/SplineComponent.h"
+#include "Components/SplineMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 AOmniLineBusRoute::AOmniLineBusRoute()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	const FName RoadSplineName = OmniTool::ConcatStrInt("RouteSpline", 0);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RootComponent->SetMobility(EComponentMobility::Stationary);
+	
+
+	const FName RoadSplineName = OmniStr::ConcatStrInt("RouteSpline", 0);
 	RouteSpline = CreateDefaultSubobject<USplineComponent>(RoadSplineName);
 	RouteSpline->SetupAttachment(RootComponent);
-	RouteSpline->bAllowDiscontinuousSpline = true;    // 도착, 출발 탄젠트를 따로 제어
+#if WITH_EDITORONLY_DATA
+	RouteSpline->bAllowDiscontinuousSpline = true; // 도착, 출발 탄젠트를 따로 제어
+#endif // WITH_EDITORONLY_DATA
+
+	RootComponent->SetVisibility(false, true);
 }
 
 void AOmniLineBusRoute::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	GenerateRouteRoad();
-
-	SpawnBus(FTransform(FVector(GetActorLocation().X, GetActorLocation().Y, 0.0)));
+	AOmnibusRoadManager* RoadManager = GetOmnibusRoadManager();
+	if (IsValid(RoadManager))
+	{
+		RoadManager->AddOmniRoute(this);
+		RootComponent->SetVisibility(RoadManager->IsRouteVisible(), true);
+	}
 }
 
 void AOmniLineBusRoute::Tick(float DeltaTime)
@@ -37,11 +51,26 @@ void AOmniLineBusRoute::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+void AOmniLineBusRoute::MakeRouteAndBus()
+{
+	LineColor = EOmniColor::GetNextColorByHue(32, 5);
+	RouteSpline->SetUnselectedSplineSegmentColor(LineColor);
+	
+	GenerateRoute();
+	MakeRouteSpline();
+	
+	MakeSplineMeshComponents();
+
+	SpawnBus(FTransform(FVector(GetActorLocation().X, GetActorLocation().Y, 0.0)));
+}
+
 void AOmniLineBusRoute::SpawnBus(const FTransform& SpawnTransform)
 {
-	const TSubclassOf<AOmniVehicleBus> VehicleBusClass = GetGameInstance<UOmnibusGameInstance>()->GetOmnibusPlayData()->GetOmniVehicleBusClass();
+	const TSubclassOf<AOmniVehicleBus> VehicleBusClass = GetOmnibusPlayData()->GetOmniVehicleBusClass();
 
-	AOmniVehicleBus* NewBus = GetWorld()->SpawnActorDeferred<AOmniVehicleBus>(VehicleBusClass, SpawnTransform);
+	AOmniVehicleBus* NewBus = GetWorld()->SpawnActorDeferred<AOmniVehicleBus>(VehicleBusClass
+	                                                                        , SpawnTransform, nullptr, nullptr
+	                                                                        , ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	NewBus->SetupSpawnInit(this);
 	NewBus->FinishSpawning(SpawnTransform);
 
@@ -52,40 +81,20 @@ void AOmniLineBusRoute::GetNearestOmniRoadTwoLaneAndLane(AOmniRoad*& OutNearRoad
 {
 	OutNearRoad = nullptr;
 	OutLaneIdx  = 0;
-
 	TArray<AActor*> OmniRoads;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniRoadDefaultTwoLane::StaticClass(), OmniRoads);
 
-	float DistanceFromNearest = TNumericLimits<float>::Max();
-	const FVector ActLoc      = GetActorLocation();
-	for (AActor* ActorToCheck : OmniRoads)
-	{
-		if (IsValid(ActorToCheck) == false)
-			continue;
-
-		AOmniRoadDefaultTwoLane* Road     = Cast<AOmniRoadDefaultTwoLane>(ActorToCheck);
-		const uint8 LaneNum = Road->GetLaneSplineNum();
-		for (int idx = 0; idx < LaneNum; ++idx)
-		{
-			const USplineComponent* Lane = Road->GetLaneSpline(idx);
-			FVector ClosestSplineLoc     = Lane->FindLocationClosestToWorldLocation(ActLoc, ESplineCoordinateSpace::World);
-			const float DistanceFromLane = (ActLoc - ClosestSplineLoc).SizeSquared();
-			if (DistanceFromLane < DistanceFromNearest)
-			{
-				OutNearRoad         = Road;
-				OutLaneIdx          = idx;
-				DistanceFromNearest = DistanceFromLane;
-			}
-		}
-	}
+	AOmniRoad::FindNearestRoadAndLane(OmniRoads
+	                                , AOmniRoadDefaultTwoLane::StaticClass()
+	                                , GetActorLocation()
+	                                , OutNearRoad
+	                                , OutLaneIdx);
 }
 
-void AOmniLineBusRoute::GenerateRouteRoad()
+void AOmniLineBusRoute::GenerateRoute()
 {
-	const int32 DefaultSplineNum = RouteSpline->GetNumberOfSplinePoints();
 	BusRouteRoads.Empty();
-	
-	bool bIsLoopRoute = false;
+
 	AOmniRoad* FirstRoad  = nullptr;
 	AOmniRoad* SecondRoad = nullptr;
 	uint32 FirstRoadLaneIdx;
@@ -94,49 +103,97 @@ void AOmniLineBusRoute::GenerateRouteRoad()
 	GetNearestOmniRoadTwoLaneAndLane(FirstRoad, FirstRoadLaneIdx);
 	SecondRoad    = FirstRoad->GetConnectedRoad(FirstRoadLaneIdx);
 	BusRouteRoads = {FirstRoad, SecondRoad};
-	PushToRouteSpline(FirstRoad->GetLaneSpline(FirstRoadLaneIdx));
-
-	// 기본 스플라인 포인트 삭제
-	for(int PointIdx = 0; PointIdx < DefaultSplineNum; ++PointIdx)
-		RouteSpline->RemoveSplinePoint(0);
 
 	// 랜덤 기반
-	constexpr int LoopLimit = 10;
+	const int LoopLimit = OmniMath::GetIntRandom(4, 17);
 	for (int i = 0; i < LoopLimit; ++i)
 	{
 		AOmniRoad* const PrevRoad     = BusRouteRoads.Last(1).Get();
 		AOmniRoad* const CurrentRoad  = BusRouteRoads.Last(0).Get();
-		// todo: 랜덤 기반에서 목적지 길찾기 기반으로 변경해야함.
+		if(OB_IS_VALID(CurrentRoad) == false)
+			return;
+		
 		AOmniRoad* const NextRoad     = CurrentRoad->GetRandomNextRoad(PrevRoad);
 		USplineComponent* CurrentLane = nullptr;
 
-		if(OB_IS_VALID(NextRoad))
+		if (IsValid(NextRoad))
 			CurrentLane = CurrentRoad->GetSplineToNextRoad(PrevRoad, NextRoad);
 
-		if (OB_IS_VALID(NextRoad) == false || OB_IS_VALID(CurrentLane) == false)
+		if (IsValid(NextRoad) == false || OB_IS_VALID(CurrentLane) == false)
 			continue;
 
 		BusRouteRoads.Push(NextRoad);
-		PushToRouteSpline(CurrentLane);
-		
+
 		// 최초 출발지에서 출발한 반대 방향으로 들어오면 탈출(경로를 루프로 구성함. 순환선)
 		if (CurrentRoad != SecondRoad && NextRoad == FirstRoad)
-		{
-			bIsLoopRoute = true;
 			break;
-		}
+	}
+	
+	if (BusRouteRoads.Last().Get()->IsA(AOmniRoadDefaultTwoLane::StaticClass()) == false)
+		BusRouteRoads.Pop();
+}
+
+void AOmniLineBusRoute::MakeRouteSpline()
+{
+	// 기본 스플라인 포인트 삭제
+	const int32 DefaultSplineNum = RouteSpline->GetNumberOfSplinePoints();
+	for (int PointIdx = 0; PointIdx < DefaultSplineNum; ++PointIdx)
+		RouteSpline->RemoveSplinePoint(0);
+
+	AOmniRoad* const FirstRoad      = BusRouteRoads[0].Get();
+	AOmniRoad* const SecondRoad     = BusRouteRoads[1].Get();
+	AOmniRoad* const LastSecondRoad = BusRouteRoads.Last(1).Get();
+	AOmniRoad* const LastFirstRoad  = BusRouteRoads.Last(0).Get();
+
+	if (OB_IS_VALID(FirstRoad) == false || OB_IS_VALID(SecondRoad) == false)
+		return;
+
+	// 시작 도로 차선 추가
+	const int32 FirstRoadLaneIdx = FirstRoad->FindConnectedRoadIdx(SecondRoad);
+	if (FirstRoadLaneIdx == INDEX_NONE)
+		return;
+	PushToRouteSpline(FirstRoad->GetLaneSpline(FirstRoadLaneIdx));
+
+	// 마지막 도로 제외.
+	for (int idx = 1; idx < BusRouteRoads.Num() - 1; ++idx)
+	{
+		AOmniRoad* const PrevRoad     = BusRouteRoads[idx - 1].Get();
+		AOmniRoad* const CurrentRoad  = BusRouteRoads[idx].Get();
+		AOmniRoad* const NextRoad     = BusRouteRoads[idx + 1].Get();
+		USplineComponent* CurrentLane = CurrentRoad->GetSplineToNextRoad(PrevRoad, NextRoad);
+
+		if (OB_IS_VALID(CurrentLane) == false)
+			continue;
+
+		PushToRouteSpline(CurrentLane);
 	}
 
-	// 경로가 순환선이 아닌 경우. U턴으로 닫힌 루프 구성
-	if (bIsLoopRoute == false)
+	// 용어
+	// 순환선 - 1. 출발지로 돌아오고, 2. 처음 출발한 방향의 '반대방향'에서 돌아오면서, 전체 루프를 구성.
+	// 반환선 - 1. 출발지로 돌아오고, 2. 처음 출발한 방향으로 돌아오면, 순환선이지만, 첫번째==마지막 차선에서 유턴으로 순환해야함.
+	// 일반선 - 1. 출발지로 돌아오지 않음. 왔던 길로 되돌아가고, 양끝에서 유턴함. 끝.
+	const bool bIsLoop = ((LastFirstRoad == FirstRoad) && (LastSecondRoad != SecondRoad));
+	
+	// 순환선이 아닌 경우. U턴으로 닫힌 루프 구성
+	if (bIsLoop == false)
 	{
-		// 출발지로 돌아오지 않은 경우. 왔던 길을 되돌아감.
-		if (BusRouteRoads[0].Get() != BusRouteRoads.Last(0).Get())
+		// 마지막 도로 차선 추가.
+		const int32 LastRoadLaneIdx = LastFirstRoad->FindConnectedRoadIdx(LastSecondRoad);
+		if (LastRoadLaneIdx == INDEX_NONE)
+			return;
+		PushToRouteSpline(LastFirstRoad->GetLaneSpline((LastRoadLaneIdx == 0) ? 1 : 0));
+
+		// 일반선. 왔던 길을 되돌아감.
+		if (LastFirstRoad != FirstRoad)
 		{
-			const int RouteRoadsSize    = BusRouteRoads.Num();
+			const int32 RouteRoadsSize    = BusRouteRoads.Num();
 			const int32 TurnStartPointIdx = RouteSpline->GetNumberOfSplinePoints() - 1;
-			
-			for(int RoadIdx = RouteRoadsSize - 1; RoadIdx >= 2 ; --RoadIdx)
+			const int32 LastLaneReverseIdx = LastFirstRoad->FindConnectedRoadIdx(LastSecondRoad);
+			if (LastLaneReverseIdx == INDEX_NONE)
+				return;
+			PushToRouteSpline(LastFirstRoad->GetLaneSpline(LastLaneReverseIdx));
+
+			for (int RoadIdx = RouteRoadsSize - 1; RoadIdx >= 2; --RoadIdx)
 			{
 				AOmniRoad* PrevRoad    = BusRouteRoads[RoadIdx].Get();
 				AOmniRoad* CurrentRoad = BusRouteRoads[RoadIdx - 1].Get();
@@ -150,25 +207,68 @@ void AOmniLineBusRoute::GenerateRouteRoad()
 				PushToRouteSpline(CurrentLane);
 			}
 			MakeUTurnRouteSpline(TurnStartPointIdx, TurnStartPointIdx + 1);
+
+			// 마지막 도로 차선 추가(첫번째 도로)
+			const uint32 ReverseLaneIdx         = (FirstRoadLaneIdx == 0) ? 1 : 0;
+			const USplineComponent* CurrentLane = BusRouteRoads[0]->GetLaneSpline(ReverseLaneIdx);
+			if (OB_IS_VALID(CurrentLane))
+			{
+				PushToRouteSpline(CurrentLane);
+			}
 		}
 		
 		// 출발한 도로 끝에서 U턴으로 닫힌 루프 구성.
-		// 출발지로 돌아오되, 나온 방향으로 다시 들어온 경우 포함. 
-		const uint32 ReverseLaneIdx         = (FirstRoadLaneIdx == 0) ? 1 : 0;
-		const USplineComponent* CurrentLane = BusRouteRoads[0]->GetLaneSpline(ReverseLaneIdx);
-		if (OB_IS_VALID(CurrentLane))
-		{
-			PushToRouteSpline(CurrentLane);
-			MakeUTurnRouteSpline(RouteSpline->GetNumberOfSplinePoints() - 1, 0);
-		}
+		// 반환선, 일반선.
+		MakeUTurnRouteSpline(RouteSpline->GetNumberOfSplinePoints() - 1, 0);
 	}
 
-	for (auto& Road : BusRouteRoads)
-	{
-		TempBusRouteRoads.Push(Road.Get());
-	}
-	
 	RouteSpline->SetClosedLoop(true);
+}
+
+void AOmniLineBusRoute::MakeSplineMeshComponents()
+{
+	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
+	constexpr bool bManualAttachment = false;
+	const bool bVisible = GetOmnibusRoadManager()->IsRouteVisible();
+
+	// 색조값(Hue == R)으로 렌더링 순서(=높이) 결정. 360이 최대값이므로 0~10으로 정규화를 위해 36으로 나눔.
+	const double OffsetHue = LineColor.FromRGBE().LinearRGBToHSV().R / 36.0;
+	const FVector Offset   = FVector(0.0, 0.0, 10.0 + OffsetHue);
+
+	// 스플라인 컴포넌트 포인트를 따라 스플라인 메시 생성
+	const int32 SplinePointsSize = RouteSpline->GetNumberOfSplinePoints();
+	for (int PointIdx = 0; PointIdx < SplinePointsSize; ++PointIdx)
+	{
+		// 마지막 포인트와 처음 포인트 연결.
+		const int NextIdx          = PointIdx + 1 < SplinePointsSize ? PointIdx + 1 : 0;
+		const FVector StartLoc     = RouteSpline->GetLocationAtSplinePoint(PointIdx, CoordSpace);
+		const FVector StartTangent = RouteSpline->GetLeaveTangentAtSplinePoint(PointIdx, CoordSpace); // 출발 탄젠트
+		const FVector EndLoc       = RouteSpline->GetLocationAtSplinePoint(NextIdx, CoordSpace);
+		const FVector EndTangent   = RouteSpline->GetArriveTangentAtSplinePoint(NextIdx, CoordSpace); // 도착 탄젠트
+
+		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), bManualAttachment, FTransform(), true));
+
+		if (OB_IS_VALID(NewSplineMesh) == false)
+			continue;
+
+		NewSplineMesh->SetStaticMesh(PlacedMesh);
+		NewSplineMesh->SetStartAndEnd(StartLoc + Offset, StartTangent, EndLoc + Offset, EndTangent);
+		NewSplineMesh->SetVisibility(bVisible);
+		NewSplineMesh->SetForwardAxis(ESplineMeshAxis::X);
+		NewSplineMesh->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		NewSplineMesh->SetHiddenInGame(false);
+		NewSplineMesh->SetGenerateOverlapEvents(false);
+		NewSplineMesh->SetCastShadow(false);
+
+		UMaterialInstanceDynamic* NewMatInstanceDynamic = NewSplineMesh->CreateDynamicMaterialInstance(0, NewSplineMesh->GetMaterial(0));
+		if (IsValid(NewMatInstanceDynamic))
+		{
+			NewMatInstanceDynamic->SetVectorParameterValue("Color", FLinearColor(LineColor));
+			NewSplineMesh->SetMaterial(0, NewMatInstanceDynamic);
+		}
+
+		FinishAddComponent(NewSplineMesh, bManualAttachment, FTransform());
+	}
 }
 
 void AOmniLineBusRoute::PushToRouteSpline(const USplineComponent* InAddLaneSpline)
@@ -242,5 +342,35 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 	RouteSpline->SetTangentsAtSplinePoint(InEndPoint  , TurnTangent          , TurnEndPointTangent, CoordSpace);
 
 	RouteSpline->UpdateSpline();
+}
+
+void AOmniLineBusRoute::InsertBusStop(AOmniStationBusStop* InFrontBusStop, AOmniStationBusStop* InAddBusStop)
+{
+	if (InFrontBusStop == nullptr)
+	{
+		RouteBusStops.Insert(InAddBusStop, 0);
+		return;
+	}
+	const int32 FindIdx = RouteBusStops.Find(InFrontBusStop);
+	if (FindIdx == INDEX_NONE)
+		return;
+
+	if (FindIdx == (RouteBusStops.Num() - 1))
+	{
+		RouteBusStops.Emplace(InAddBusStop);
+		return;
+	}
+
+	RouteBusStops.Insert(InAddBusStop, FindIdx + 1);
+}
+
+void AOmniLineBusRoute::SetRouteRender(const bool SetVisibility)
+{
+	RootComponent->SetVisibility(SetVisibility, true);
+}
+
+void AOmniLineBusRoute::ToggleRouteRender()
+{
+	RootComponent->ToggleVisibility(true);
 }
 

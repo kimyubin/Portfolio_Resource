@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <random>
+
 #include "CoreMinimal.h"
 #include "Omnibus.h"
 #include "UObject/NoExportTypes.h"
@@ -10,6 +12,9 @@
 ////////////////////////////////////////////////
 // 게임플레이 유틸리티 정적 클래스 및 함수 모음
 ////////////////////////////////////////////////
+
+//~=============================================================================
+// 테스트 및 디버그 출력
 
 /**
  * 개체 유효성 테스트 및 로그 출력.
@@ -29,8 +34,9 @@
  * @return 객체가 사용가능하면 true 반환. null, pending kill, 가비지 수집 대상인 경우 false 반환.
  * @see IsOmniValidLog
  */
-#define OB_IS_WEAK_PTR_VALID(WeakObjectPtr) IsOmniTWeakObjectValidLog(WeakObjectPtr, GET_VAR_NAME(WeakObjectPtr), OB_LOG_FUNC_LINE_INFO, this->GetName())
+#define OB_IS_WEAK_PTR_VALID(WeakObjectPtr) IsOmniTWeakObjectValidLog(WeakObjectPtr, GET_VAR_NAME(WeakObjectPtr), OB_LOG_FUNC_LINE_INFO, (this ? this->GetName() : ""))
 
+enum class ECityBlockType : uint8;
 /**
  * 개체 유효성 테스트 및 로그 출력
  * @param    Test           테스트할 개체
@@ -69,83 +75,41 @@ FORCEINLINE bool IsOmniTWeakObjectValidLog(const TWeakObjectPtr<UObject> Test, c
 	return false;
 }
 
-/** 객체 ID 생성용 */
+namespace OmniMsg
+{
+	/** 확인창이 포함된 대화상자형 메시지 */
+	void Dialog(const FString& InMsg);
+	
+	/** 일반 토스트 팝업 메시지. 확인하지 않음. */
+	void ToastMsg(const FString& InMsg);
+}
+
+//~=============================================================================
+/* 객체 ID 생성용 */
 UCLASS()
 class OMNIBUS_API UOmniID : public UObject
 {
 	GENERATED_BODY()
 
 public:
+	static uint64 GenerateID_Number(const AActor* InActor);
+
 	/**
 	 * 상위 19bit : 날짜 정보. 10bit(연) : 1900 ~ 2924, 4bit(월) : 1~12, 5bit(일) : 1~31
 	 * 중위 17bit : 실행 시간 초
 	 * 하위 28bit : 일일 생성 순번
 	 */
-	static uint64 GenerateID_Number();
-
+	static uint64 GenerateID_NumberByDate();
 	static std::string GetID_DateToString(const uint64 InID);
 
 	/** 액터가 스폰된 위치와 레벨 기반으로 ID 생성. */
 	static uint64 GenerateID_NumberByPos(const AActor* InActor);
+	static uint64 GenerateID_NumberByHash(const AActor* InActor);
 	static std::string GetID_InfoToString(const uint64 InID);
 
 private:
 	static std::atomic<uint64> ID_TodayCountAtomic;
 };
-
-namespace OmniTool
-{
-	/**
-	 * 문자열과 인덱스를 합쳐서 FName으로 반환.
-	 * @return "InNameString_InIdx" 
-	 */
-	FName ConcatStrInt(const std::string& InNameString, const int32 InIdx);
-}
-
-/**
- * 언리얼 엔진 컨테이너 커스텀 함수 모음.
- */
-namespace OmniContainer
-{
-	/////////////
-	// TMap 관련
-
-	/**
-	 * 키와 값을 TMap에 추가. 키값이 이미 있으면, 해당 키에 대한 값 갱신
-	 * TMap 멤버 할당 및 값 갱신 함수.
-	 *
-	 * @param InMap : 멤버를 추가할 대상 TMap
-	 * @param InKey : 키
-	 * @param InValue : 값
-	 */
-	template <typename InKeyType, typename InValueType, typename SetAllocator, typename KeyFuncs>
-	FORCEINLINE void TMap_Emplace(TMap<InKeyType, InValueType, SetAllocator, KeyFuncs>& InMap, const InKeyType& InKey, const InValueType& InValue)
-	{
-		InValueType* ValuePtr = InMap.Find(InKey);
-		if (ValuePtr == nullptr)
-			InMap.Emplace(InKey, InValue);
-		else
-			*ValuePtr = InValue;
-	}
-
-	/**
-	 * TMap의 지정된 키와 연결된 값을 찾아서 반환. 값이 없거나, 유효하지 않을 경우 nullptr 반환
-	 * 
-	 * @param InMap 찾을 대상 TMap
-	 * @param InKey 찾고자 하는 키
-	 * @return 찾아낸 값. 유효하지 않거나 값이 없으면 nullptr 반환
-	 */
-	template <typename InKeyType, typename InValueType, typename SetAllocator, typename KeyFuncs>
-	FORCEINLINE InValueType TMap_Find(TMap<InKeyType, InValueType, SetAllocator, KeyFuncs>& InMap, const InKeyType& InKey)
-	{
-		InValueType* ValuePtr = InMap.Find(InKey);
-		if (ValuePtr == nullptr)
-			return nullptr;
-		else
-			return IsValid(*ValuePtr) ? *ValuePtr : nullptr;
-		
-	}
-}
 
 /** 시간 관련 함수 및 변수를 취급 */
 struct FOmniTime
@@ -158,6 +122,80 @@ private:
 	/** 게임 시작 시각. 초로 기록 */
 	static uint64 LevelStartTime_Sec;
 };
+
+
+//~=============================================================================
+// 유용한 함수 모음
+
+struct FOmniStatics
+{
+	/**
+	 * InTestComp와 동일한 ObjectType(Collision Type)을 추적하는 간소화된 오버랩 함수.
+	 * InTestComp에 오버랩된 컴포넌트 배열 반환. BeginPlay 이전에 사용.
+	 * 
+     * @param InTestComp             테스트할 컴포넌트
+     * @param InComponentClassFilter 찾고자하는 컴포넌트 클래스 유형
+     * @param OutOverlapComps        오버랩된 컴포넌트 배열 반환값.
+     * @return 조건에 부합한 요소를 찾으면 true 반환.
+     */
+	static bool GetOverlapComps(UPrimitiveComponent* InTestComp, UClass* InComponentClassFilter, TArray<UPrimitiveComponent*>& OutOverlapComps);
+
+	/**
+	 * InTestComp와 동일한 ObjectType(Collision Type)을 추적하는 간소화된 오버랩 함수.
+	 * InTestComp에 오버랩된 컴포넌트 배열 반환. BeginPlay 이전에 사용.
+	 * 
+	 * @param InTestComp         테스트할 컴포넌트
+	 * @param InActorClassFilter 찾고자하는 액터 클래스 유형
+	 * @param OutOverlapActors   오버랩된 액터 배열 반환값.
+	 * @return  조건에 부합한 요소를 찾으면 true 반환.
+	 */
+	static bool GetOverlapActors(UPrimitiveComponent* InTestComp, UClass* InActorClassFilter, TArray<AActor*>& OutOverlapActors);
+
+	/**
+	 * 지정된 ObjectPath로 에셋 데이터를 가져옴.
+	 * 
+	 * @param ObjectPath 조회할 객체 경로
+	 * @param bIncludeOnlyOnDiskAssets true인 경우 메모리 내 개체가 무시됩니다. 더 빠른 호출 가능
+	 * @param bSkipARFilteredAssets true인 경우 IsAsset에 대해 true를 반환하지만 현재 플랫폼의 자산이 아닌 개체를 건너뜁니다.
+	 * @return 자산 데이터. 객체를 찾을 수 없으면 유효하지 않음.
+	 */
+	static FAssetData GetAssetByObjectPath(const FSoftObjectPath& ObjectPath
+	                                     , bool bIncludeOnlyOnDiskAssets = false
+	                                     , bool bSkipARFilteredAssets    = true);
+	/**
+	 * 지정된 ObjectPath로 에셋 데이터가 존재하는지 찾습니다.
+	 * 
+	 * @param ObjectPath 조회할 객체 경로
+	 * @return 객체를 찾을 수 있다면 true.
+	 */
+	static bool IsAssetExists(const FSoftObjectPath& ObjectPath);
+	
+	/**
+	 * ObjectPath + _N 형식으로 중복된 이름을 회피합니다.
+	 * 이미 유일한 이름이라면, 숫자를 포함하지 않고, 원본을 반환합니다.
+	 * ObjectPath 이름에 숫자가 포함되어 있어도, 이를 무시하고 '_N'을 추가합니다.
+	 * AssetToolsModule.CreateUniqueAssetName()의 대안입니다.
+	 * 
+	 * @param ObjectPath 유일한지 체크할 이름.
+	 * @param OutAssetPathName 유일하지 않다면 "_N"을 더해 반환. 이미 유일하다면 그대로 반환.
+	 * @return 생성에 성공하면 true;
+	 */
+	static bool CreateUniqueAssetName(const FString& ObjectPath, FString& OutAssetPathName );
+	
+};
+
+/** 문자열 관련 유틸리티 */
+namespace OmniStr
+{
+	/**
+	 * 문자열과 인덱스를 합쳐서 FName으로 반환.
+	 * @return "InNameString_InIdx" 
+	 */
+	FName ConcatStrInt(const std::string& InNameString, const int32 InIdx);
+
+	/** 열거형을 문자열로 변환. 필요에 따라 오버로딩해서 추가예정. */
+	FString EnumToString(ECityBlockType InBlockType);
+}
 
 /** 비트연산 */
 namespace OmniBit
@@ -276,7 +314,7 @@ namespace OmniMath
 	double GetBoxWidth(const FBox& InBox);
 	
 	/////////////////
-	//수치 관련
+	// 수치 
 
 	/**
 	 * 반올림. 0.5는 가장 가까운 짝수값이 됨.<br>
@@ -296,7 +334,91 @@ namespace OmniMath
 	 * */
 	FVector RoundHalfToEvenVector(const FVector& InVector, const double InUnitValue = 1.0);
 
+	//~====================
+	// 난수
+
+	/** random_device seed 기반 mt19937 랜덤 엔진 */
+	inline std::mt19937 GetRandomEngine()
+	{
+		std::random_device deviceSeed;
+		std::mt19937 rdEngine(deviceSeed());
+		return rdEngine;
+	}
+	
+	/**
+	 * 정수 난수 생성.
+	 * 비결정적 난수(하드웨어) 시드 및 mt19937 랜덤 엔진 기반, 균일 분포 난수 리턴. 닫힌 구간[Min, Max].
+	 * @param Min 값 범위 포함
+	 * @param Max 값 범위 포함
+	 * @return 구간 내 임의의 정수 난수 반환.
+	 */
+	template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+	T GetIntRandom(const T Min = 0, const T Max = RAND_MAX)
+	{
+		std::mt19937 rdEngine = GetRandomEngine();
+		std::uniform_int_distribution<T> rdRange(Min, Max);
+		return rdRange(rdEngine);
+	}
+
+	/**
+	 * 실수 난수 생성.
+	 * 비결정적 난수(하드웨어) 시드 및 mt19937 랜덤 엔진 기반, 균일 분포 난수 리턴. 닫힌 구간[Min, Max].
+	 * @param Min 값 범위 포함
+	 * @param Max 값 범위 포함
+	 * @return 구간 내 임의의 실수 난수 반환.
+	 */
+	template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+	T GetRealRandom(const T Min = static_cast<T>(0.0), const T Max = static_cast<T>(1.0))
+	{
+		std::mt19937 rdEngine = GetRandomEngine();
+		std::uniform_real_distribution<T> rdRange(Min, Max);
+		return rdRange(rdEngine);
+	}
 }
+
+//~=============================================================================
+/** 언리얼 엔진 컨테이너 커스텀 레퍼 함수 모음. */
+namespace OmniContainer
+{
+	/////////////
+	// TMap 관련
+
+	/**
+	 * 키와 값을 TMap에 추가. 키값이 이미 있으면, 해당 키에 대한 값 갱신
+	 * TMap 멤버 할당 및 값 갱신 함수.
+	 *
+	 * @param InMap : 멤버를 추가할 대상 TMap
+	 * @param InKey : 키
+	 * @param InValue : 값
+	 */
+	template <typename InKeyType, typename InValueType, typename SetAllocator, typename KeyFuncs>
+	FORCEINLINE void TMap_Emplace(TMap<InKeyType, InValueType, SetAllocator, KeyFuncs>& InMap, const InKeyType& InKey, const InValueType& InValue)
+	{
+		InValueType* ValuePtr = InMap.Find(InKey);
+		if (ValuePtr == nullptr)
+			InMap.Emplace(InKey, InValue);
+		else
+			*ValuePtr = InValue;
+	}
+
+	/**
+	 * TMap의 지정된 키와 연결된 값을 찾아서 반환. 값이 없거나, 유효하지 않을 경우 nullptr 반환
+	 * 
+	 * @param InMap 찾을 대상 TMap
+	 * @param InKey 찾고자 하는 키
+	 * @return 찾아낸 값. 유효하지 않거나 값이 없으면 nullptr 반환
+	 */
+	template <typename InKeyType, typename InValueType, typename SetAllocator, typename KeyFuncs>
+	FORCEINLINE InValueType TMap_Find(TMap<InKeyType, InValueType, SetAllocator, KeyFuncs>& InMap, const InKeyType& InKey)
+	{
+		InValueType* ValuePtr = InMap.Find(InKey);
+		if (ValuePtr == nullptr)
+			return nullptr;
+		else
+			return IsValid(*ValuePtr) ? *ValuePtr : nullptr;
+	}
+}
+
 
 /**
  * 테스트용 3D 텍스트 Render

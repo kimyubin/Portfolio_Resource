@@ -7,7 +7,7 @@
 #include "OmnibusRoadManager.h"
 #include "OmnibusTypes.h"
 #include "OmnibusUtilities.h"
-#include "OmniDetectSphereComponent.h"
+#include "OmniConnectorComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 
@@ -29,9 +29,9 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 	MainRoadSpline->SetTangentAtSplinePoint(0, DefaultVector, CoordSpace);
 	MainRoadSpline->SetTangentAtSplinePoint(1, DefaultVector, CoordSpace);
 
-	for (int i = 0; i < RoadConnectDetectorNum; ++i)
+	for (int i = 0; i < RoadConnectorNum; ++i)
 	{
-		InitRoadConnectDetector(i, GetMainRoadSpline(), i);
+		InitRoadConnector(i, GetMainRoadSpline(), i);
 	}
 
 	for (int i = 0; i < LaneSplineNum; ++i)
@@ -39,6 +39,14 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 		InitLaneSpline(i, GetMainRoadSpline());
 	}
 }
+
+#if WITH_EDITOR
+void AOmniRoadDefaultTwoLane::PostEditMove(bool bFinished)
+{
+	SnapRoadSplineTerminalLocation();
+	Super::PostEditMove(bFinished);
+}
+#endif // WITH_EDITOR
 
 void AOmniRoadDefaultTwoLane::BeginPlay()
 {
@@ -48,8 +56,6 @@ void AOmniRoadDefaultTwoLane::BeginPlay()
 void AOmniRoadDefaultTwoLane::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	
-	Cast<UOmnibusGameInstance>(GetGameInstance())->GetOmnibusRoadManager()->RemoveOmniRoad(GetOmniID());
 }
 
 void AOmniRoadDefaultTwoLane::Tick(float DeltaTime)
@@ -57,28 +63,22 @@ void AOmniRoadDefaultTwoLane::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void AOmniRoadDefaultTwoLane::PostEditMove(bool bFinished)
-{
-	Super::PostEditMove(bFinished);
-	SnapRoadSplineTerminalLocation();
-}
-
 void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
 {
 	// 현재 도로의 감지용 컴포넌트 순회. 감지된 대상 도로를 찾음.
-	for (UOmniDetectSphereComponent* const Detector : RoadConnectDetectors)
+	for (UOmniConnectorComponent* const Connector : RoadConnectors)
 	{
-		if (OB_IS_VALID(Detector) == false)
+		if (OB_IS_VALID(Connector) == false)
 			continue;
 
 		// 스플라인 포인트 이동시, 감지용 컴포넌트도 같이 이동함.
-		Detector->SetRelativeTransformToSpline();
+		Connector->SetRelativeTransformToSpline();
 
-		UOmniDetectSphereComponent* const DetectedTargetSphere = DetectOmniRoad(Detector);
-		if(DetectedTargetSphere == nullptr)
+		UOmniConnectorComponent* const DetectedTargetConnector = DetectOmniRoad(Connector);
+		if(DetectedTargetConnector == nullptr)
 			continue;
 			
-		Detector->ChangeSplineTangentNormal(DetectedTargetSphere);
+		Connector->ChangeSplineTangentNormal(DetectedTargetConnector);
 	}
 }
 
@@ -93,20 +93,9 @@ void AOmniRoadDefaultTwoLane::SnapRoadSplineTerminalLocation()
 		if (SplinePointLocation.Z != 0.0)
 		{
 			SplinePointLocation.Z = 0.0;
-			OB_LOG_STR("Note. Locking to z-axis 0.0")
 			GetMainRoadSpline()->SetLocationAtSplinePoint(i, SplinePointLocation, CoordSpace);
 		}
 	}
-
-	//스플라인 시작점 반올림.
-	const FVector SplineStartPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(0, CoordSpace);
-	const FVector SplineStartPointRoundHalf = OmniMath::RoundHalfToEvenVector(SplineStartPointPosition, FOmniConst::Unit_Length);
-	GetMainRoadSpline()->SetLocationAtSplinePoint(0, SplineStartPointRoundHalf, CoordSpace);
-
-	//스플라인 끝점 반올림.
-	const FVector SplineLastPointPosition  = GetMainRoadSpline()->GetLocationAtSplinePoint(GetSplinePointLastIdx(), CoordSpace);
-	const FVector SplineLastPointRoundHalf = OmniMath::RoundHalfToEvenVector(SplineLastPointPosition, FOmniConst::Unit_Length);
-	GetMainRoadSpline()->SetLocationAtSplinePoint(GetSplinePointLastIdx(), SplineLastPointRoundHalf, CoordSpace);
 }
 
 void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
@@ -119,12 +108,13 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 	//스플라인 컴포넌트 포인트를 따라 스플라인 메시 생성
 	FVector StartLoc, StartTangent;
 	FVector EndLoc, EndTangent;
-	GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(0, StartLoc, StartTangent, CoordSpace);
+	const USplineComponent* RoadSpline = GetMainRoadSpline();
+	RoadSpline->GetLocationAndTangentAtSplinePoint(0, StartLoc, StartTangent, CoordSpace);
 
-	const int32 SplinePointLastIdx = GetSplinePointLastIdx();
-	for (int i = 0; i < SplinePointLastIdx; ++i)
+	const int32 SplinePointsSize = RoadSpline->GetNumberOfSplinePoints();
+	for (int PointIdx = 1; PointIdx < SplinePointsSize; ++PointIdx)
 	{
-		GetMainRoadSpline()->GetLocationAndTangentAtSplinePoint(i + 1, EndLoc, EndTangent, CoordSpace);
+		RoadSpline->GetLocationAndTangentAtSplinePoint(PointIdx, EndLoc, EndTangent, CoordSpace);
 
 		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), false, FTransform(), false));
 
@@ -134,9 +124,8 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 		NewSplineMesh->SetStaticMesh(PlacedMesh);
 		NewSplineMesh->SetStartAndEnd(StartLoc, StartTangent, EndLoc, EndTangent);
 		NewSplineMesh->SetForwardAxis(ESplineMeshAxis::X);
-		NewSplineMesh->SetCanEverAffectNavigation(true);
-		NewSplineMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		NewSplineMesh->SetCollisionProfileName(FName("BlockAllDynamic"));
+		NewSplineMesh->SetCanEverAffectNavigation(false);
+		NewSplineMesh->SetCollisionProfileName(EOmniCollisionProfile::SysDetector);  // 버스 정류장 등 감지
 
 		StartLoc     = EndLoc;
 		StartTangent = EndTangent;
@@ -159,9 +148,12 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 
 	LaneSpline_0->ClearSplinePoints();
 	LaneSpline_1->ClearSplinePoints();
+
+#if WITH_EDITORONLY_DATA
 	LaneSpline_0->bAllowDiscontinuousSpline = true; // 도착, 출발 탄젠트를 따로 제어
 	LaneSpline_1->bAllowDiscontinuousSpline = true;
-
+#endif // WITH_EDITORONLY_DATA
+	
 	const int32 RoadSplinePointsNum = MainRoadSpline->GetNumberOfSplinePoints();
 	const double SplineSpacing      = GetRoadWidth() * 0.25; //각 스플라인 간격. 표현할 메시 너비의 1/4 지점에 각각 설치.
 
@@ -256,9 +248,10 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 
 USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
-	if (OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
+	// 이전 도로의 정보는 불필요. 시작 지점의 경우 nullptr이 오기 때문에 체크 안함. 
+	if (OB_IS_VALID(InNextTargetRoad))
 	{
-		// 2차선은 접근 위치 번호와 진행방향이 반대
+		// 2차선은 이웃 도로의 Idx와 해당 도로로 가는 차선의 번호가 동일.
 		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
 		
 		if (NextRoadIdx != INDEX_NONE)
@@ -273,9 +266,4 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetSplineToNextRoad(AOmniRoad* InPrev
 USplineComponent* AOmniRoadDefaultTwoLane::GetMainRoadSpline() const
 {
 	return GetRoadSpline(0);
-}
-
-int AOmniRoadDefaultTwoLane::GetSplinePointLastIdx()
-{
-	return GetMainRoadSpline()->GetNumberOfSplinePoints() - 1;
 }

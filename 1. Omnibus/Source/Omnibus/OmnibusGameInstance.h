@@ -26,6 +26,12 @@ class OMNIBUS_API UOmnibusGameInstance : public UGameInstance
 	virtual void Shutdown() override;
 
 public:
+	/**
+	 *	GameState의 HandlePostBeginPlay()에서 호출됨.
+	 *	레벨 액터 로드 후, 레벨 초기화 진행.
+	 *
+	 *	@see AOmnibusGameStateBase::HandlePostBeginPlay()
+	 */
 	UFUNCTION(BlueprintCallable)
 	void LevelInitializer();
 
@@ -40,7 +46,15 @@ public:
 	UOmnibusUIsHandler* GetOmnibusUIsHandler();
 
 	UFUNCTION(BlueprintCallable)
-	AOmnibusRoadManager* GetOmnibusRoadManager();
+	AOmnibusRoadManager* GetOmnibusRoadManager() const;
+
+	/**
+	 *  모든 게임플레이 레벨에서 OmnibusRoadManager에 의해 호출되어 초기화 되어야함.
+	 *  아닐 경우 경고 후 종료.
+	 * @param InRoadManager : 해당 레벨에서의 로드 매니저 
+	 */
+	UFUNCTION(BlueprintCallable)
+	void SetOmnibusRoadManager(AOmnibusRoadManager* InRoadManager);
 
 	/** 레벨간 유지되어야하는 OmnibusPlayData로 사용할 BP클래스.*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Defined Class")
@@ -55,5 +69,5 @@ private:
 	UOmnibusUIsHandler* OmnibusUIsHandler;
 
 	UPROPERTY()
-	AOmnibusRoadManager* OmnibusRoadManager;
+	TWeakObjectPtr<AOmnibusRoadManager> OmnibusRoadManager;
 };

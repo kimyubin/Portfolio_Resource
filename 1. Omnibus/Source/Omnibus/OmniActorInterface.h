@@ -21,8 +21,10 @@ class OMNIBUS_API IOmniActorInterface
 	GENERATED_BODY()
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
-public:
+protected:
 	/** 아이디 생성 및 세팅. */
-	virtual void   SetOmniID() = 0;
+	virtual void SetOmniID() = 0;
+
+public:
 	virtual uint64 GetOmniID() = 0;
 };

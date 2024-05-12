@@ -15,18 +15,21 @@ class OMNIBUS_API AOmniPawn : public APawn, public IOmniActorInterface
 
 public:
 	AOmniPawn();
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
 	virtual void BeginPlay() override;
 
 public:
 	virtual void Tick(float DeltaTime) override;
-	virtual void OnConstruction(const FTransform& Transform) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+private:
 	virtual void SetOmniID() override;
+
+public:
 	virtual uint64 GetOmniID() override;
 
 protected:

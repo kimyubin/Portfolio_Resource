@@ -17,15 +17,17 @@ class OMNIBUS_API AOmniOfficerPawn : public APawn
 
 public:
 	AOmniOfficerPawn();
+	virtual void OnConstruction(const FTransform& Transform) override;
+
+	/** 기준 기본값을 기반으로 값 생성. 생성자 및 블루프린트에서 수정 후 OnConstruction에서도 사용 */
+	void InitSettings();
 
 protected:
 	virtual void BeginPlay() override;
 
-	/** 기준 기본값을 기반으로 값 생성. 생성자 및 블루프린트에서 수정 후 BeginPlay에서도 사용 */
-	void InitSettings();
-
 public:
 	virtual void Tick(float DeltaTime) override;
+
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	// 맵 이동 관련
@@ -39,7 +41,7 @@ public:
 	float GetDesiredOrthoWidth() const;
 
 	bool AddZoomStep(const int InZoomStepDelta);
-	bool AddZoomStep(const float InZoomStepAxis);
+	bool AddZoomStepByAxis(const float InZoomStepAxis);
 
 	// 액터 위치 관련	
 	void GoToActor(const FVector& TargetPosition);
@@ -56,7 +58,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
 	float ZoomSpeed;
 
-	/** 최대 줌 단계. 줌 조절 단계 수*/
+	/** 최대 줌 단계. 줌 조절 단계 수. 0~MaxZoomStep*/
 	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
 	uint8 MaxZoomStep;
 
@@ -73,9 +75,7 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
 	int CurrentZoomStep;
 
-	/** 한 스탭당 단위 orthoWidth*/
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
-	float UnitOrthoWidth;
+	std::vector<float> OrthoWidths;
 
 	bool      bCameraZooming;
 	bool      bUsingMouseWheelCameraZoom;    // 휠로 줌

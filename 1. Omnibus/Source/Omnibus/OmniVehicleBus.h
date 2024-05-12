@@ -22,6 +22,7 @@ class OMNIBUS_API AOmniVehicleBus : public AOmniPawn
 
 public:
 	AOmniVehicleBus();
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -42,7 +43,7 @@ protected:
 
 	/** 노선 스플라인의 현재 목표를 바라보는 회전 가져오기*/
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	FRotator GetRotationToTarget(const FVector InTargetPos);
+	FRotator GetRotationToTarget(const FVector InTargetPos) const;
 
 	/** 추적 대상 따라가는 속도*/
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
@@ -53,7 +54,7 @@ public:
 	void SetDriveMaxSpeed(const double InMaxSpeed = 1200.0);
 
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	void SetDriveAcceleration(const double InAcceleration = 4000.0);
+	void SetDriveAcceleration(const double InAcceleration = 1200.0);
 
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
 	void SetDriveDeceleration(const double InDeceleration = 12000.0);
@@ -79,8 +80,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	double SteeringDistance;
 
-	/** 노선 위에서 움직이는 추적 대상의 이동 속도 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	/** 노선 위에서 움직이는 추적 대상의 이동 속도. PawnMovement->MaxSpeed 초기화됨 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	double RouteTargetMoveSpeed;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
@@ -88,5 +89,13 @@ public:
 
 	/** 현재 추적하고 있는 노선 Spline의 거리(distance). beginPlay에서 가장 가까운 InputKey로 초기화됨. */
 	float CurrentRouteDistance;
+
+	/** 스플라인 위치 이동 속도. 곡선에서 느려짐. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	double NowRouteSpeed;
+
+	// 디버그 확인용
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	double NowBusSpeed;
 
 };
