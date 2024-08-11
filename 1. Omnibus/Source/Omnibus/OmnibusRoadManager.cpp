@@ -3,18 +3,34 @@
 #include "OmnibusRoadManager.h"
 
 #include "OmnibusGameInstance.h"
+#include "OmnibusPlayData.h"
 #include "OmnibusUtilities.h"
 #include "OmniCityBlock.h"
 #include "OmniLineBusRoute.h"
+#include "OmniPassenger.h"
 #include "OmniRoadDefaultTwoLane.h"
 #include "OmniStationBusStop.h"
+#include "PathVisualizator.h"
 #include "Kismet/GameplayStatics.h"
+#include "OmniAsync.h"
+#include "OmnibusLevelManager.h"
+#include "OmniPlayMainUI.h"
 
 
 AOmnibusRoadManager::AOmnibusRoadManager()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	bRouteVisible = true;
+
+	PoolCapacity       = 64;
+	PoolLowerThreshold = 32;
+	bPoolInsufficient  = true;
+
+	LevelManager = nullptr;
+
+	BusRouteMapVersion = 0;
+
+	bPassengerVisible = false;
+	bRouteVisible     = false;
 }
 
 void AOmnibusRoadManager::OnConstruction(const FTransform& Transform)
@@ -28,6 +44,10 @@ void AOmnibusRoadManager::BeginPlay()
 	Super::BeginPlay();
 
 	GetGameInstance<UOmnibusGameInstance>()->SetOmnibusRoadManager(this);
+
+	PassengerPool = MakeUnique<TCircularQueue<TWeakObjectPtr<AOmniPassenger>>>(PoolCapacity);
+
+	SetActorTickEnabled(true);
 }
 
 void AOmnibusRoadManager::PostBeginPlay()
@@ -36,27 +56,267 @@ void AOmnibusRoadManager::PostBeginPlay()
 
 	ExecuteAutoManageFunction();
 
-	for(auto& RouteTuple : OmniRouteTMap)
+	for (const auto& [Key, RouteWeak] : OmniRouteTMap)
 	{
-		AOmniLineBusRoute* Route = RouteTuple.Value.Get();
-		if(IsValid(Route) == false)
-			continue;
-
-		Route->MakeRouteAndBus();
+		if (AOmniLineBusRoute* Route = RouteWeak.Get())
+			Route->GenerateRandomRoute();
 	}
+
+	// 모든 레벨 초기화 완료 후 레벨 매니저 스폰
+	FActorSpawnParameters SpawnParameter          = FActorSpawnParameters();
+	SpawnParameter.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	LevelManager = GetWorld()->SpawnActor<AOmnibusLevelManager>(AOmnibusLevelManager::StaticClass(), SpawnParameter);
+	LevelManager->Initialize(this);
+
+
+	FOmniAsync::OnPostDataUpdate.AddUObject(this, &AOmnibusRoadManager::NotifyUpdateBusRoute);
 }
 
 void AOmnibusRoadManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-
-	OmniRoadsTMap.Empty();
 }
 
 void AOmnibusRoadManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	FillPassengerPool();
 }
+
+void AOmnibusRoadManager::NotifyUpdateBusRoute()
+{
+	// 버스 노선 변경을 하차 승객에게 간접적으로 전파.
+	++BusRouteMapVersion;
+
+	// 환승 경로 없는 passenger 재시도
+	for (const TWeakObjectPtr<AOmniPassenger>& NoPathPassengerWeak : NoTransferPathPassengerList)
+	{
+		if (AOmniPassenger* NoPathPassenger = NoPathPassengerWeak.Get())
+			NoPathPassenger->RetryJourneyFromSector();
+	}
+	NoTransferPathPassengerList.Reset();
+
+	// 정류장에 있는 승객 재시도
+	for (const auto& [Key, PassengerWeak] : OmniPassengerTMap)
+	{
+		if (AOmniPassenger* Passenger = PassengerWeak.Get())
+			Passenger->RetryJourneyFromStop();
+	}
+}
+
+void AOmnibusRoadManager::AddNoTransferPathPassenger(AOmniPassenger* InPassenger)
+{
+	NoTransferPathPassengerList.Emplace(InPassenger);
+}
+
+std::tuple<FSectorInfo, TArray<FSectorInfo>> AOmnibusRoadManager::GetHomeAndDests()
+{
+	FSectorInfo HomeInfo;
+	TArray<FSectorInfo> DestInfoList;
+	OB_IF(OmniCityBlockList.Num() <= 2)
+		return std::make_tuple(HomeInfo, DestInfoList);
+
+	// 출발지
+	const int32 HomeBlockIdx        = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+	AOmniCityBlock* const HomeBlock = OmniCityBlockList[HomeBlockIdx].Get();
+	const int32 HomeSectorIdx       = OmniMath::GetIntRandom(0, HomeBlock->GetSectorNum() - 1);
+
+	constexpr int LoopMax = 1000;
+
+	// 도착지
+	int32 DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+	for (int LoopCount = 0; LoopCount < LoopMax; ++LoopCount)
+	{
+		if (HomeBlockIdx != DestBlockIdx)
+			break;
+		DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+	}
+
+	AOmniCityBlock* DestBlock = OmniCityBlockList[DestBlockIdx].Get();
+	int32 DestSectorIdx       = OmniMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
+	
+	// 이웃 블록인 경우, 섹터가 이웃하지 않게 조정.
+	if (HomeBlock->IsNeighborBlock(DestBlock))
+	{
+		bool bNeighborSector = true;
+		for (int LoopCount = 0; LoopCount < LoopMax; ++LoopCount)
+		{
+			if (HomeBlock->IsNeighborSector(HomeSectorIdx, DestBlock, DestSectorIdx) == false)
+			{
+				bNeighborSector = false;
+				break;
+			}
+			DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+		}
+
+		// 이웃하지 않은 섹터를 찾지 못한 경우, 이웃하지 않은 블록과 섹터 선택
+		if (bNeighborSector)
+		{
+			for (int LoopCount = 0; LoopCount < LoopMax; ++LoopCount)
+			{
+				DestBlock = OmniCityBlockList[DestBlockIdx].Get();
+				if (HomeBlock->IsNeighborBlock(DestBlock) == false)
+					break;
+				DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+			}
+			DestSectorIdx = OmniMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
+		}
+	}
+
+	HomeInfo     = FSectorInfo(HomeBlock, HomeSectorIdx);
+	DestInfoList = {FSectorInfo(DestBlock, DestSectorIdx)};
+
+	return std::make_tuple(HomeInfo, DestInfoList);
+}
+
+void AOmnibusRoadManager::FillPassengerPool()
+{
+	if (bPoolInsufficient == false)
+		return;
+
+	// 부하를 줄이기 위해 틱당 스폰되는 Passenger 수를 조절.
+	constexpr int SpawnPerTick = 2;
+	for (int Count = 0; Count < SpawnPerTick; ++Count)
+	{
+		GeneratePassengerInPool();
+	}
+
+	if (PassengerPool->IsFull())
+	{
+		SetActorTickEnabled(false);
+		bPoolInsufficient = false;
+	}
+}
+
+void AOmnibusRoadManager::GeneratePassengerInPool()
+{
+	if (PassengerPool->IsFull())
+		return;
+
+	const UOmnibusPlayData* PlayData = GetOmnibusPlayData();
+	if (PlayData == nullptr)
+		return;
+
+	const FTransform SpawnTransform = FTransform(FVector(100'000, 100'000, -100'000));
+	AOmniPassenger* NewPassenger = GetWorld()->SpawnActorDeferred<AOmniPassenger>(PlayData->GetPassengerClass()
+	                                                                            , SpawnTransform, nullptr, nullptr
+	                                                                            , ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+	NewPassenger->DisablePassenger();
+	PassengerPool->Enqueue(NewPassenger);
+
+	NewPassenger->FinishSpawning(SpawnTransform);
+}
+
+AOmniPassenger* AOmnibusRoadManager::PopPassengerInPool()
+{
+	if (PassengerPool->IsEmpty())
+	{
+		GeneratePassengerInPool();
+	}
+
+	TWeakObjectPtr<AOmniPassenger> FrontPassengerWeak;
+	PassengerPool->Dequeue(FrontPassengerWeak);
+	AOmniPassenger* Passenger = FrontPassengerWeak.Get();
+	OB_IF(Passenger == nullptr)
+		return nullptr;
+
+	Passenger->EnablePassenger();
+	AddPassenger(Passenger);
+
+	if (PassengerPool->Count() < PoolLowerThreshold)
+	{
+		SetActorTickEnabled(true);
+		bPoolInsufficient = true;
+	}
+
+	return Passenger;
+}
+
+
+void AOmnibusRoadManager::SetRoutesRender(const bool InVisibility)
+{
+	bRouteVisible = InVisibility;
+	for (const auto& [Key, RouteWeak] : OmniRouteTMap)
+	{
+		if (AOmniLineBusRoute* Route = RouteWeak.Get())
+			Route->SetRouteRender(InVisibility);
+	}
+}
+
+void AOmnibusRoadManager::ToggleRoutesRender()
+{
+	SetRoutesRender(!bRouteVisible);
+}
+
+bool AOmnibusRoadManager::IsRouteVisible() const
+{
+	return bRouteVisible;
+}
+
+void AOmnibusRoadManager::SetPassengerRender(const bool InVisibility)
+{
+	bPassengerVisible = InVisibility;
+	for (const auto& [Key, PassengerWeak] : OmniPassengerTMap)
+	{
+		if (AOmniPassenger* Passenger = PassengerWeak.Get())
+			Passenger->SetMeshVisibility(bPassengerVisible);
+	}
+}
+
+APathVisualizator* AOmnibusRoadManager::VisualizePath(const FTransferPath& InTransferPath)
+{
+	// 캐시에서 찾기.
+	// 찾으면서 겸사겸사 SetPathVisibility를 off하기 위해 for문 사용.
+	int FindVisualIdx = INDEX_NONE;
+	for (int idx = 0; idx < PathVisualizatorCacheList.Num(); ++idx)
+	{
+		const APathVisualizator* VisualPtr = PathVisualizatorCacheList[idx].Get();
+		if (VisualPtr == nullptr)
+			continue;
+
+		if (VisualPtr->IsSamePath(InTransferPath))
+		{
+			FindVisualIdx = idx;
+		}
+		else
+		{ 
+			VisualPtr->SetPathVisibility(false);
+		}
+	}
+	if (FindVisualIdx != INDEX_NONE)
+	{
+		TWeakObjectPtr<APathVisualizator> VisualWeak = PathVisualizatorCacheList[FindVisualIdx];
+		PathVisualizatorCacheList.RemoveAt(FindVisualIdx, 1, false);
+		PathVisualizatorCacheList.Emplace(VisualWeak);
+	}
+	else if (PathVisualizatorCacheList.Num() < VisualizatorCacheSize)
+	{
+		FActorSpawnParameters SpawnParameter          = FActorSpawnParameters();
+		SpawnParameter.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		APathVisualizator* Visualizator = GetWorld()->SpawnActor<APathVisualizator>(GetOmnibusPlayData()->GetPathVisualizatorClass(), GetTransform(), SpawnParameter);
+		PathVisualizatorCacheList.Emplace(Visualizator);
+	}
+	else
+	{
+		TWeakObjectPtr<APathVisualizator> VisualWeak = PathVisualizatorCacheList[0];
+		PathVisualizatorCacheList.RemoveAt(0, 1, false);
+		PathVisualizatorCacheList.Emplace(VisualWeak);
+	}
+
+	APathVisualizator* LastVisual = PathVisualizatorCacheList.Last().Get();
+	LastVisual->VisualizeTransferRoutes(InTransferPath);
+	LastVisual->SetPathVisibility(true);
+
+	return LastVisual;
+}
+
+
+//~=============================================================================
+// 시스템 관리 함수.
 
 void AOmnibusRoadManager::ExecuteAutoManageFunction()
 {
@@ -64,96 +324,115 @@ void AOmnibusRoadManager::ExecuteAutoManageFunction()
 	ExecuteAllRoadsDetect();
 	CleanupInvalidStationInRoad();
 
-	CollectStation();
+	CollectBusStop();
 	ExecuteAllStationsDetect();
 
 	CollectCityBlock();
-	CleanupInvalidStationInCityBlock();
+	CleanupInvalidStopInCityBlock();
 
 	CollectRoute();
+
+	// CollectPassenger();
 }
 
 void AOmnibusRoadManager::CollectOmniRoad()
 {
-	OmniRoadsTMap.Empty();
+	OmniRoadsTMap.Reset();
 	TArray<AActor*> RoadList;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniRoad::StaticClass(), RoadList);
 
-	for (AActor* const& RoadListActor : RoadList)
+	for (AActor* RoadListActor : RoadList)
 	{
-		if (RoadListActor->IsA(AOmniRoad::StaticClass()))
-			AddOmniRoad(Cast<AOmniRoad>(RoadListActor));
+		if (AOmniRoad* OmniRoad = Cast<AOmniRoad>(RoadListActor))
+			AddOmniRoad(OmniRoad);
 	}
 }
 
 void AOmnibusRoadManager::ExecuteAllRoadsDetect()
 {
-	for (const auto& RoadTuple : OmniRoadsTMap)
+	for (const auto& [Key, RoadWeak] : OmniRoadsTMap)
 	{
-		RoadTuple.Value->DetectAllConnectedOmniRoad();
+		if (AOmniRoad* Road = RoadWeak.Get())
+			Road->DetectAllConnectedOmniRoad();
 	}
 }
 
 void AOmnibusRoadManager::CleanupInvalidStationInRoad()
 {
-	for (const auto& RoadTuple : OmniRoadsTMap)
+	for (const auto& [Key, RoadWeak] : OmniRoadsTMap)
 	{
-		RoadTuple.Value->RemoveInvalidBusStop();
+		if (AOmniRoad* Road = RoadWeak.Get())
+			Road->RemoveInvalidBusStop();
 	}
 }
 
-void AOmnibusRoadManager::CollectStation()
+void AOmnibusRoadManager::CollectBusStop()
 {
-	OmniStationTMap.Empty();
-	TArray<AActor*> StationList;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniStationBusStop::StaticClass(), StationList);
+	OmniStationTMap.Reset();
+	TArray<AActor*> StopList;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniStationBusStop::StaticClass(), StopList);
 
-	for (AActor* const& RoadListActor : StationList)
+	for (AActor* SpotActor : StopList)
 	{
-		if (RoadListActor->IsA(AOmniStationBusStop::StaticClass()))
-			AddStation(Cast<AOmniStationBusStop>(RoadListActor));
+		if (AOmniStationBusStop* Stop = Cast<AOmniStationBusStop>(SpotActor))
+			AddStation(Stop);
 	}
 }
 
 void AOmnibusRoadManager::ExecuteAllStationsDetect()
 {
-	for (const auto& Station : OmniStationTMap)
+	for (const auto& [Key, StationWeak] : OmniStationTMap)
 	{
-		Station.Value->SearchRoadAndBlock();
+		if (AOmniStationBusStop* Station = StationWeak.Get())
+			Station->SearchRoadAndBlock();
 	}
 }
 
 void AOmnibusRoadManager::CollectCityBlock()
 {
-	OmniCityBlockTMap.Empty();
+	OmniCityBlockList.Reset();
 	TArray<AActor*> CityBlockList;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniCityBlock::StaticClass(), CityBlockList);
 
-	for (AActor* const& RoadListActor : CityBlockList)
+	for (AActor* BlockActor : CityBlockList)
 	{
-		if (RoadListActor->IsA(AOmniCityBlock::StaticClass()))
-			AddCityBlock(Cast<AOmniCityBlock>(RoadListActor));
+		if (AOmniCityBlock* Block = Cast<AOmniCityBlock>(BlockActor))
+			AddCityBlock(Block);
 	}
 }
 
-void AOmnibusRoadManager::CleanupInvalidStationInCityBlock()
+void AOmnibusRoadManager::CleanupInvalidStopInCityBlock()
 {
-	for (const auto& CityBlockTuple : OmniCityBlockTMap)
+	for (const TWeakObjectPtr<AOmniCityBlock>& CityBlockWeak : OmniCityBlockList)
 	{
-		CityBlockTuple.Value->RemoveInvalidBusStop();
+		if (AOmniCityBlock* CityBlock = CityBlockWeak.Get())
+			CityBlock->RemoveInvalidBusStop();
 	}
 }
 
 void AOmnibusRoadManager::CollectRoute()
 {
-	OmniRouteTMap.Empty();
-	TArray<AActor*> OmniRouteList;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniLineBusRoute::StaticClass(), OmniRouteList);
+	OmniRouteTMap.Reset();
+	TArray<AActor*> BusLineList;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniLineBusRoute::StaticClass(), BusLineList);
 
-	for (AActor* const& RoadListActor : OmniRouteList)
+	for (AActor* BusLineActor : BusLineList)
 	{
-		if (RoadListActor->IsA(AOmniLineBusRoute::StaticClass()))
-			AddOmniRoute(Cast<AOmniLineBusRoute>(RoadListActor));
+		if (AOmniLineBusRoute* BusLine = Cast<AOmniLineBusRoute>(BusLineActor))
+			AddOmniRoute(BusLine);
+	}
+}
+
+void AOmnibusRoadManager::CollectPassenger()
+{
+	OmniPassengerTMap.Reset();
+	TArray<AActor*> PassengerList;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOmniPassenger::StaticClass(), PassengerList);
+
+	for (AActor* PassengerActor : PassengerList)
+	{
+		if (AOmniPassenger* Passenger = Cast<AOmniPassenger>(PassengerActor))
+			AddPassenger(Passenger);
 	}
 }
 
@@ -182,10 +461,8 @@ void AOmnibusRoadManager::RemoveOmniRoad(AOmniRoad* InRoad)
 AOmniRoad* AOmnibusRoadManager::FindOmniRoad(const uint64 InId)
 {
 	const TWeakObjectPtr<AOmniRoad>* FindPtr = OmniRoadsTMap.Find(InId);
-	if (FindPtr == nullptr)
-		return nullptr;
-	else
-		return (*FindPtr).Get();
+
+	return (FindPtr != nullptr) ? FindPtr->Get() : nullptr;
 }
 
 void AOmnibusRoadManager::AddStation(AOmniStationBusStop* InStation)
@@ -213,10 +490,8 @@ void AOmnibusRoadManager::RemoveStation(AOmniStationBusStop* InStation)
 AOmniStationBusStop* AOmnibusRoadManager::FindStation(const uint64 InId)
 {
 	const TWeakObjectPtr<AOmniStationBusStop>* FindPtr = OmniStationTMap.Find(InId);
-	if (FindPtr == nullptr)
-		return nullptr;
-	else
-		return (*FindPtr).Get();
+
+	return (FindPtr != nullptr) ? FindPtr->Get() : nullptr;
 }
 
 void AOmnibusRoadManager::AddCityBlock(AOmniCityBlock* InCityBlock)
@@ -224,13 +499,16 @@ void AOmnibusRoadManager::AddCityBlock(AOmniCityBlock* InCityBlock)
 	if (OB_IS_VALID(InCityBlock) == false)
 		return;
 
-	TWeakObjectPtr<AOmniCityBlock>& CityBlockMapValue = OmniCityBlockTMap.FindOrAdd(InCityBlock->GetOmniID());
-	CityBlockMapValue = InCityBlock;
+	OmniCityBlockList.Emplace(InCityBlock);
 }
 
 void AOmnibusRoadManager::RemoveCityBlockByID(const uint64 InId)
 {
-	OmniCityBlockTMap.Remove(InId);
+	OmniContainer::RemoveSwapByPredicate(OmniCityBlockList, [InId](const TWeakObjectPtr<AOmniCityBlock>& InCityBlockWeak)
+	{
+		AOmniCityBlock* CityBlock = InCityBlockWeak.Get();
+		return CityBlock ? CityBlock->GetOmniID() == InId : false;
+	});
 }
 
 void AOmnibusRoadManager::RemoveCityBlock(AOmniCityBlock* InCityBlock)
@@ -243,11 +521,13 @@ void AOmnibusRoadManager::RemoveCityBlock(AOmniCityBlock* InCityBlock)
 
 AOmniCityBlock* AOmnibusRoadManager::FindCityBlock(const uint64 InId)
 {
-	const TWeakObjectPtr<AOmniCityBlock>* FindPtr = OmniCityBlockTMap.Find(InId);
-	if (FindPtr == nullptr)
-		return nullptr;
-	else
-		return (*FindPtr).Get();
+	const TWeakObjectPtr<AOmniCityBlock>* FindPtr = OmniCityBlockList.FindByPredicate([InId](const TWeakObjectPtr<AOmniCityBlock>& InCityBlockWeak)
+	{
+		AOmniCityBlock* CityBlock = InCityBlockWeak.Get();
+		return CityBlock ? CityBlock->GetOmniID() == InId : false;
+	});
+
+	return (FindPtr != nullptr) ? FindPtr->Get() : nullptr;
 }
 
 void AOmnibusRoadManager::AddOmniRoute(AOmniLineBusRoute* InOmniRoute)
@@ -275,29 +555,37 @@ void AOmnibusRoadManager::RemoveOmniRoute(AOmniLineBusRoute* InOmniRoute)
 AOmniLineBusRoute* AOmnibusRoadManager::FindOmniRoute(const uint64 InId)
 {
 	const TWeakObjectPtr<AOmniLineBusRoute>* FindPtr = OmniRouteTMap.Find(InId);
-	if (FindPtr == nullptr)
-		return nullptr;
-	else
-		return (*FindPtr).Get();
+
+	return (FindPtr != nullptr) ? FindPtr->Get() : nullptr;
 }
 
-void AOmnibusRoadManager::SetRoutesRender(const bool SetVisibility)
+void AOmnibusRoadManager::AddPassenger(AOmniPassenger* InPassenger)
 {
-	bRouteVisible = SetVisibility;
-	for (auto& RouteTuple : OmniRouteTMap)
-	{
-		AOmniLineBusRoute* Route = RouteTuple.Value.Get();
-		if (IsValid(Route))
-			Route->SetRouteRender(SetVisibility);
-	}
+	if (OB_IS_VALID(InPassenger) == false)
+		return;
+
+	TWeakObjectPtr<AOmniPassenger>& PassengerMapValue = OmniPassengerTMap.FindOrAdd(InPassenger->GetOmniID());
+	PassengerMapValue = InPassenger;
+
+	UOmniPlayMainUI::OnPostPassengersNum.Broadcast(1);
 }
 
-void AOmnibusRoadManager::ToggleRoutesRender()
+void AOmnibusRoadManager::RemovePassengerByID(const uint64 InId)
 {
-	SetRoutesRender(!bRouteVisible);
+	OmniPassengerTMap.Remove(InId);
 }
 
-bool AOmnibusRoadManager::IsRouteVisible() const
+void AOmnibusRoadManager::RemovePassenger(AOmniLineBusRoute* InPassenger)
 {
-	return bRouteVisible;
+	if (OB_IS_VALID(InPassenger) == false)
+		return;
+
+	RemovePassengerByID(InPassenger->GetOmniID());
+}
+
+AOmniPassenger* AOmnibusRoadManager::FindPassenger(const uint64 InId)
+{
+	const TWeakObjectPtr<AOmniPassenger>* FindPtr = OmniPassengerTMap.Find(InId);
+
+	return (FindPtr != nullptr) ? FindPtr->Get() : nullptr;
 }

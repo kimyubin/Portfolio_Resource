@@ -17,9 +17,6 @@ class OMNIBUS_API UOmnibusInputConfig : public UDataAsset
 
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	UInputAction* Omni_IA_TIME_STOP;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UInputAction* Omni_IA_LeftButton;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
@@ -29,10 +26,25 @@ public:
 	UInputAction* Omni_IA_Drag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	UInputAction* Omni_IA_Zoom;
+	UInputAction* Omni_IA_Point_Zoom;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UInputAction* Omni_IA_MoveCamera;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UInputAction* Omni_IA_Center_Zoom;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UInputAction* Omni_IA_Time_Stop;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UInputAction* Omni_IA_Time_Speed;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UInputAction* Omni_IA_Time_Fast;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UInputAction* Omni_IA_Time_Slow;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UInputAction* Omni_IA_ToggleRouteVisibility;

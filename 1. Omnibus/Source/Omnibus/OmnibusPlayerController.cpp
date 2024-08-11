@@ -12,6 +12,9 @@
 #include "OmnibusUtilities.h"
 #include "OmniLineBusRoute.h"
 #include "OmniOfficerPawn.h"
+#include "OmniStationBusStop.h"
+#include "OmniTimeManager.h"
+#include "Kismet/GameplayStatics.h"
 
 
 void AOmnibusPlayerController::BeginPlay()
@@ -23,6 +26,8 @@ void AOmnibusPlayerController::BeginPlay()
 	bEnableTouchEvents     = true;
 	bEnableMouseOverEvents = true;
 	bEnableClickEvents     = true;
+
+	StartBusStop = nullptr;
 }
 
 void AOmnibusPlayerController::PlayerTick(float DeltaTime)
@@ -44,7 +49,34 @@ void AOmnibusPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_LeftButton, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::LeftButton);
 	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_RightButton, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::RightButton);
 	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_Drag, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::Drag);
+
+	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_Time_Speed, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::SpeedUpDownGameTime);
+	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_Time_Stop, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::ToggleTimeStartPause);
+	
 	EnhancedInputComponent->BindAction(InputActionsConfig->Omni_IA_ToggleRouteVisibility, ETriggerEvent::Triggered, this, &AOmnibusPlayerController::ToggleRouteVisibility);
+}
+
+void AOmnibusPlayerController::GetMultiHitResultsUnderCursorOnOrthographic(const ECollisionChannel TraceChannel, TArray<FHitResult>& OutHitResults) const
+{
+	const AOmniOfficerPawn* Officer = GetPawn<AOmniOfficerPawn>();
+	if (OB_IS_VALID(Officer) == false)
+		return;
+
+	// 커서 스크린 좌표를 월드 좌표로 변환.
+	FVector2D MousePosition;
+	Cast<ULocalPlayer>(Player)->ViewportClient->GetMousePosition(MousePosition);
+
+	FVector ScreenWorldLocation;
+	FVector ScreenWorldDirection;
+	UGameplayStatics::DeprojectScreenToWorld(this, MousePosition, ScreenWorldLocation, ScreenWorldDirection);
+
+	// 커서의 월드 좌표에서 바라보는 클릭한 지점으로 라인트레이스
+	// 직교너비에 영향을 받지 않기 위해, 카메라 높이로 보정합니다.
+	const FVector CamLocation = PlayerCameraManager->GetCameraLocation();
+	const FVector StartPoint  = FVector(ScreenWorldLocation.X, ScreenWorldLocation.Y, CamLocation.Z);
+	const FVector EndPoint    = StartPoint + (ScreenWorldDirection * Officer->GetSpringArmLength() * 2.0);
+
+	GetWorld()->LineTraceMultiByChannel(OutHitResults, StartPoint, EndPoint, TraceChannel);
 }
 
 void AOmnibusPlayerController::LeftButton(const FInputActionValue& InputValue)
@@ -53,16 +85,47 @@ void AOmnibusPlayerController::LeftButton(const FInputActionValue& InputValue)
 	// if (PlayMode == EOmniPlayMode::Move)
 	if (InputValue.Get<bool>() == false)
 	{
-		const TSubclassOf<AOmniLineBusRoute> BusRouteClass = GetOmniGameInstance()->GetOmnibusPlayData()->GetOmniLineBusRouteClass();
+		AOmniStationBusStop* ResultBusStop = nullptr;
+		TArray<FHitResult> HitResults;
+		GetMultiHitResultsUnderCursorOnOrthographic(EOmniCollisionChannel::OverlapOnlyTrace, HitResults);
+		for (const FHitResult& Hit : HitResults)
+		{
+			AActor* HitActor = Hit.GetActor();
+			if (IsValid(HitActor) && HitActor->IsA(AOmniStationBusStop::StaticClass()))
+			{
+				ResultBusStop = Cast<AOmniStationBusStop>(HitActor);
+				break;
+			}
+		}
+		if (IsValid(ResultBusStop) == false)
+			return;
 
-		FHitResult Result;
-		GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), false, Result);
-		FTransform SpawnTransform   = FTransform(FRotator(), Result.Location * FVector(1.0, 1.0, 0.0));
-		AOmniLineBusRoute* NewRoute = GetWorld()->SpawnActorDeferred<AOmniLineBusRoute>(BusRouteClass, SpawnTransform, nullptr, nullptr
-		                                                                              , ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
-		NewRoute->MakeRouteAndBus();
-		NewRoute->FinishSpawning(SpawnTransform);
+		if (StartBusStop.IsValid())
+		{
+			if (StartBusStop.Get() == ResultBusStop || StartBusStop->GetOwnerOmniRoad() == ResultBusStop->GetOwnerOmniRoad())
+			{
+				// todo: 적절한 알림 메시지 필요.
+				OB_LOG("Too Close Between BusStops!")
+				StartBusStop = nullptr;
+				return;
+			}
+
+			// 버스 노선 소환
+			const TSubclassOf<AOmniLineBusRoute> BusRouteClass = GetOmniGameInstance()->GetOmnibusPlayData()->GetOmniLineBusRouteClass();
+			const FTransform SpawnTransform                    = FTransform(StartBusStop.Get()->GetActorLocation() * FVector(1.0, 1.0, 0.0));
+			FActorSpawnParameters SpawnParameter               = FActorSpawnParameters();
+			SpawnParameter.SpawnCollisionHandlingOverride      = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+			AOmniLineBusRoute* NewRoute = GetWorld()->SpawnActor<AOmniLineBusRoute>(BusRouteClass, SpawnTransform, SpawnParameter);
+			NewRoute->InitRoutePathAndBus({StartBusStop, ResultBusStop});
+
+			StartBusStop = nullptr;
+		}
+		else
+		{
+			StartBusStop = ResultBusStop;
+		}
 	}
 }
 
@@ -75,7 +138,7 @@ void AOmnibusPlayerController::RightButton(const FInputActionValue& InputValue)
 		AOmniOfficerPawn* const Officer = GetPawn<AOmniOfficerPawn>();
 		if (OB_IS_VALID(Officer))
 		{
-			const bool bActive = InputValue.Get<bool>();;
+			const bool bActive = InputValue.Get<bool>();
 			Officer->SetDragActive(bActive, GetMousePosVector2D());
 			if (bActive)
 				SetInputModeGameOnly();
@@ -97,47 +160,35 @@ void AOmnibusPlayerController::Drag(const FInputActionValue& InputValue)
 	}
 }
 
+void AOmnibusPlayerController::ToggleTimeStartPause(const FInputActionValue& InputValue)
+{
+	GetOmniGameInstance()->GetOmniTimeManager()->ToggleStartPauseGameTime();
+}
+
+void AOmnibusPlayerController::SpeedUpDownGameTime(const FInputActionValue& InputValue)
+{
+	const float Axis    = InputValue.Get<float>();
+	UOmniTimeManager* TimeManager = GetOmniGameInstance()->GetOmniTimeManager();
+
+	if(Axis < 0.0f)
+	{
+		TimeManager->GameSpeedDown();
+	}
+	else if(Axis > 0.0f)
+	{
+		TimeManager->GameSpeedUp();
+	}
+}
+
 void AOmnibusPlayerController::ToggleRouteVisibility(const FInputActionValue& InputValue)
 {
-	AOmnibusRoadManager* RoadManager = GetOmniGameInstance()->GetOmnibusRoadManager();
-	if(IsValid(RoadManager))
+	if (InputValue.Get<bool>() == false)
 	{
-		const bool bReleased = (InputValue.Get<bool>() == false);
-		if(bReleased)
+		if (AOmnibusRoadManager* RoadManager = GetOmniGameInstance()->GetOmnibusRoadManager())
+		{
 			RoadManager->ToggleRoutesRender();
+		}
 	}
-}
-
-void AOmnibusPlayerController::SpawnAndTrackPreviewBusStop(EBusStopType PreviewType)
-{
-	if (PreviewType == EBusStopType::None)
-		return;
-
-	if (IsPreviewMode)
-		CancelBuild();
-
-	IsPreviewMode = true;
-
-	FHitResult Result;
-	GetHitResultUnderCursor(ECC_Visibility, false, Result);
-}
-
-void AOmnibusPlayerController::SpawnBusStop()
-{
-	if (bHoverUI)
-		return;
-
-	if (IsPreviewMode == false)
-		return;
-
-	if (PC_Weak_PreviewBusStop.IsValid())
-	{
-	}
-}
-
-void AOmnibusPlayerController::CancelBuild()
-{
-	IsPreviewMode = false;
 }
 
 FVector2D AOmnibusPlayerController::GetMousePosVector2D() const

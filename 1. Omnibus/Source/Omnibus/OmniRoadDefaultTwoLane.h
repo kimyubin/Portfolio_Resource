@@ -7,8 +7,8 @@
 #include "GameFramework/Actor.h"
 #include "OmniRoadDefaultTwoLane.generated.h"
 
-using namespace std;
 
+struct FRoadLengthMesh;
 /**
  * 기본 왕복 2차선 도로. 
  */
@@ -51,9 +51,23 @@ public:
 	// Construction Script 전용 함수 끝.
 	/////////////////////////////////////////////////////////////////////
 
-	virtual USplineComponent* GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad) override;
+	virtual AOmniRoad* GetNextRoadByLaneIdx(const int32 InLaneIdx) override;
+	
+	virtual int32 FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad
+	                                  , AOmniRoad* InNextTargetRoad) override;
 
 	UFUNCTION()
 	USplineComponent* GetMainRoadSpline() const;
 
+	/** 도로 길이에 따른 메시 반환 */
+	UFUNCTION()
+	UStaticMesh* GetRoadMesh(float InLaneLength);
+	
+	/**
+	 * 적용할 스태틱 메시. 휘어져야하기 때문에 버텍스가 충분해야합니다.
+	 * 스플라인 포인트 사이의 거리에 따라 적용되는 메시의 버텍스를 차등하기 위해 서로 다른 수준의 LOD를 가진 Mesh들로 구성됩니다.
+	 * 길이가 길면 더 조밀한 메시를 사용합니다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	TArray<FRoadLengthMesh> LaneMeshList;
 };

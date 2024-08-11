@@ -6,6 +6,7 @@
 #include "OmniActor.h"
 #include "OmniRoad.generated.h"
 
+struct FBusStopDistance;
 class UOmniConnectorComponent;
 class AOmniStationBusStop;
 class USplineComponent;
@@ -47,9 +48,9 @@ protected:
 	              , const uint8 InRoadConnectorNum
 	              , const uint8 InLaneSplineNum);
 
-	void InitRoadSpline(const uint32 InIdx);
-	void InitRoadConnector(const uint32 InIdx, USplineComponent* InOwnerRoadSpline, const uint32 InSplinePointIdx);
-	void InitLaneSpline(const uint32 InIdx, USplineComponent* InOwnerRoadSpline);
+	void InitRoadSpline(const int32 InIdx);
+	void InitRoadConnector(const int32 InIdx, USplineComponent* InOwnerRoadSpline, const int32 InSplinePointIdx);
+	void InitLaneSpline(const int32 InIdx, USplineComponent* InOwnerRoadSpline);
 
 public:
 	/**
@@ -58,18 +59,36 @@ public:
 	 * @param InNextTargetRoad 다음 이동해야할 도로
 	 * @return 다음 차선 lane
 	 */
-	virtual USplineComponent*   GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad);
+	USplineComponent* GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad);
 
-	USplineComponent* GetRoadSpline(const uint32 InIdx) const;
-	USplineComponent* GetLaneSpline(const uint32 InIdx) const;
+	/**
+	 * Lane 차선으로 갈 수 있는 다음도로 반환. LaneIdx 기반.
+	 */
+	virtual AOmniRoad* GetNextRoadByLaneIdx(const int32 InLaneIdx);
+	
+	/** 다음 차선 번호 찾기 */
+	virtual int32 FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad
+	                                  , AOmniRoad* InNextTargetRoad);
 
-	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx);
-	void AddConnectedRoadBoth(const UOmniConnectorComponent* InTargetConnector, const uint8 InMyAccessIdx);
+	/**
+	 * 차선 스플라인과 그 경로 위에 있는 버스 정류장을 순서대로 반환.
+	 * 
+	 * @param InLaneIdx 차선 인덱스 
+	 * @return 0 : USplineComponent* - 차선 스플라인 
+	 * @return 1 : TArray<FBusStopDistance> - 차선의 진행 방향으로 정렬된 버스 정류장 배열
+	 */
+	std::tuple<USplineComponent*, TArray<FBusStopDistance>> GetLaneAndBusStop(const int32 InLaneIdx) const;
+
+	USplineComponent* GetRoadSpline(const int32 InIdx) const;
+	USplineComponent* GetLaneSpline(const int32 InIdx) const;
+
+	virtual void AddConnectedRoadSingle(AOmniRoad* InRoad, const int32 InAccessIdx);
+	void AddConnectedRoadBoth(const UOmniConnectorComponent* InTargetConnector, const int32 InMyAccessIdx);
 
 protected:
-	void RemoveConnectedRoadSingle(const uint8 InAccessIdx);
+	void RemoveConnectedRoadSingle(const int32 InAccessIdx);
 	void RemoveConnectedRoadSingle(AOmniRoad* InRoad);
-	void RemoveConnectedRoadBoth(const uint8 InAccessIdx);
+	void RemoveConnectedRoadBoth(const int32 InAccessIdx);
 	void RemoveConnectedRoadBoth(AOmniRoad* InRoad);
 	/** 모든 연결 도로 양방향 제거. */
 	void RemoveAllConnectedRoadsBoth();
@@ -84,7 +103,7 @@ public:
 	 * @return 정류장의 Index. 찾지 못하면 INDEX_NONE.
 	 */
 	int32 FindBusStopIdx(AOmniStationBusStop* InBusStop) const;
-	
+
 	bool HasBusStopByID(const uint64 InId);
 	bool HasBusStop(AOmniStationBusStop* InBusStop) const;
 
@@ -94,10 +113,10 @@ public:
 	void RemoveBusStop(AOmniStationBusStop* InBusStop);
 	void RemoveInvalidBusStop();
 
+	TArray<TWeakObjectPtr<AOmniStationBusStop>> GetOwnedBusStops();
+	
 	/** 도로 포인터로 연결된 도로 Idx 가져오기. 실패하면 -1 반환. */
 	int32 FindConnectedRoadIdx(AOmniRoad* InRoad) const;
-
-	void FindPath(AOmniRoad* InStartRoad, AOmniRoad* InEndRoad, AOmniRoad* PrevRoad, TArray<AOmniRoad*>& OutPath);
 
 	/**
 	 * 다음으로 진행할 도로 반환
@@ -106,7 +125,9 @@ public:
 	 */
 	AOmniRoad* GetRandomNextRoad(AOmniRoad* InPrevRoad);
 
-	AOmniRoad* GetConnectedRoad(const uint32 ConnectedRoadIdx) const { return ConnectedRoadsArray[ConnectedRoadIdx]; }
+	AOmniRoad* GetConnectedRoad(const int32 ConnectedRoadIdx) const;
+
+	int32 GetConnectedRoadNum() const { return ConnectedRoadsArray.Num(); };
 
 	uint8 GetLaneSplineNum() const { return LaneSplineNum; };
 
@@ -119,7 +140,7 @@ protected:
 	 * @param Connector 탐지할 컴포넌트
 	 * @return 탐지된 컴포넌트, 없다면 nullptr
 	 */
-	UOmniConnectorComponent* DetectOmniRoad(UOmniConnectorComponent* const Connector);
+	UOmniConnectorComponent* DetectOmniRoad(UOmniConnectorComponent* Connector);
 
 public:
 	/**
@@ -131,8 +152,7 @@ public:
 	 * @param OutLaneIdx    가장 가까운 차선의 Index.
 	 * @return 목록에서 가까운 도로 찾기 성공시 true.
 	 */
-	static bool FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* InTargetClass, const FVector& InTargetPos, AOmniRoad*& OutNearRoad
-	                                 , uint32& OutLaneIdx);
+	static bool FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* InTargetClass, const FVector& InTargetPos, AOmniRoad*& OutNearRoad, int32& OutLaneIdx);
 
 protected:
 	/** 연결되어있는 도로 집합 */

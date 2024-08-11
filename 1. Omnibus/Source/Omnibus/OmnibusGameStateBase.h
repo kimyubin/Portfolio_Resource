@@ -22,4 +22,6 @@ public:
 	 * HandleBeginPlay()에서 모든 액터의 BeginPlay() 호출 후, HandlePostBeginPlay() 호출.  
 	 */
 	virtual void HandlePostBeginPlay();
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };

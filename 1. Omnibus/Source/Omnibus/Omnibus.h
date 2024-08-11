@@ -23,6 +23,9 @@ DECLARE_LOG_CATEGORY_EXTERN(Omnibus, Log, All);
 
 #define OB_ERROR(Format, ...) UE_LOG(Omnibus, Error, TEXT("%s %s"), *OB_LOG_FUNC_LINE_INFO, *FString::Printf(TEXT(Format), ##__VA_ARGS__))
 
+/** 조건이 false이면 로그만 남기는 가벼운 검사입니다. */
+#define OB_LIGHT_CHECK(cond, Format, ...) if ((cond) == false) { OB_LOG(Format, ##__VA_ARGS__) }
+
 /**
  * string 형식 출력 <br>
  * OB_LOG_STR(string)
@@ -38,9 +41,3 @@ struct FOBCheck
 };
 /** 순서 확인용 */
 #define OB_ORDER_CHECK() OB_LOG("%s / check num: %d", *GetName(), ++FOBCheck::Number)
-
-/** 시간 측정 */
-#define OB_TIME_START() std::chrono::system_clock::time_point TimeCheckStart = std::chrono::system_clock::now();
-#define OB_TIME_CHECK(Format) OB_LOG("%s %lld", Format, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - TimeCheckStart).count()) \
- TimeCheckStart = std::chrono::system_clock::now();
-#define OB_TIME_END() OB_LOG("%s %lld", "TimeCheckEnd", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - TimeCheckStart).count())

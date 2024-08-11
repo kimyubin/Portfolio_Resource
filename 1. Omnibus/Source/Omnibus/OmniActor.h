@@ -18,18 +18,21 @@ class OMNIBUS_API AOmniActor : public AActor, public IOmniActorInterface
 	GENERATED_BODY()
 
 	friend class AOmnibusGameStateBase;
+
 public:
 	AOmniActor();
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
 	virtual void BeginPlay() override;
-	
+
 	/**
-	 * 로드되는 모든 액터의 BeginPlay()가 호출된 다음, 실행됨.
-	 * 액터 초기화 순서가 필요한 경우에 사용함.
+	 * 레벨에서 로드되는 모든 액터의 BeginPlay()가 호출된 이후에 실행됩니다.
+	 * 액터 초기화 순서가 필요한 경우에 사용합니다.
+	 * 
+	 * @note 플레이 중 스폰되는 경우 발동되지 않습니다.
 	 */
-	virtual void PostBeginPlay();
+	virtual void PostBeginPlay() override;
 
 public:
 	virtual void Tick(float DeltaTime) override;
@@ -47,15 +50,17 @@ protected:
 
 	/** 게임 인스턴스 및 시스템 객체 */
 	UFUNCTION(BlueprintCallable)
-	UOmnibusGameInstance* GetOmniGameInstance() const;
+	virtual UOmnibusGameInstance* GetOmniGameInstance() const override;
 	UFUNCTION(BlueprintCallable)
-	UOmnibusPlayData* GetOmnibusPlayData() const;
+	virtual UOmnibusPlayData* GetOmnibusPlayData() const override;
 	UFUNCTION(BlueprintCallable)
-	UOmnibusUIsHandler* GetOmnibusUIsHandler() const;
+	virtual UOmnibusUIsHandler* GetOmnibusUIsHandler() const override;
 	UFUNCTION(BlueprintCallable)
-	AOmnibusRoadManager* GetOmnibusRoadManager() const;
+	virtual AOmnibusRoadManager* GetOmnibusRoadManager() const override;
+	UFUNCTION(BlueprintCallable)
+	virtual UOmniTimeManager* GetOmniTimeManager() const override;
 
-	
+
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	uint64 MyOmniID = 0;
 };

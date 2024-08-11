@@ -8,10 +8,10 @@
 #include "OmnibusTypes.h"
 #include "OmnibusUtilities.h"
 #include "OmniCityBlockWidget.h"
+#include "OmniRoad.h"
 #include "OmniStationBusStop.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
-#include "Components/TextRenderComponent.h"
 #include "Components/WidgetComponent.h"
 
 AOmniCityBlock::AOmniCityBlock()
@@ -72,9 +72,34 @@ void AOmniCityBlock::BeginPlay()
 	}
 }
 
+void AOmniCityBlock::PostBeginPlay()
+{
+	Super::PostBeginPlay();
+
+	// 섹터의 위치는 임시로 버스 정류장의 위치로 지정
+	SubSectorList.Reset();
+	for (TWeakObjectPtr<AOmniStationBusStop>& StopWeak : OwnedBusStops)
+	{
+		const AOmniStationBusStop* Stop = StopWeak.Get();
+		if (Stop == nullptr)
+			continue;
+
+		// 임시 오프셋
+		constexpr double Offset = 500.0;
+
+		const float ClosestInputKey    = BlockOutLine->FindInputKeyClosestToWorldLocation(Stop->GetActorLocation());
+		const FVector ClosestLocation  = BlockOutLine->GetLocationAtSplineInputKey(ClosestInputKey, ESplineCoordinateSpace::Local);
+		const FVector Inside           = BlockOutLine->GetRightVectorAtSplineInputKey(ClosestInputKey, ESplineCoordinateSpace::Local);
+		const FVector RelativeLocation = ClosestLocation + (Inside * Offset);
+
+		SubSectorList.Emplace(this, StopWeak, RelativeLocation);
+		// SimpleTextRender(RelativeLocation+GetActorLocation(), 0, ("0"), 150);
+	}
+}
+
 void AOmniCityBlock::MakeCollisionAlongSpline()
 {
-	if (OB_IS_VALID(PlacedMesh) == false)
+	if (OB_IS_VALID(OutLineMesh) == false)
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
@@ -98,20 +123,23 @@ void AOmniCityBlock::MakeCollisionAlongSpline()
 		if (OB_IS_VALID(NewSplineMesh) == false)
 			continue;
 
-		NewSplineMesh->SetStaticMesh(PlacedMesh);
+		NewSplineMesh->SetStaticMesh(OutLineMesh);
 		NewSplineMesh->SetStartAndEnd(StartLoc, StartTangent, EndLoc, EndTangent);
 		NewSplineMesh->SetForwardAxis(ESplineMeshAxis::X);
-		NewSplineMesh->SetCollisionProfileName(EOmniCollisionProfile::SysDetector);  // 버스 정류장 등 감지
+		NewSplineMesh->SetCollisionProfileName(EOmniCollisionProfile::SysDetectorOverlap);  // 버스 정류장 등 감지
+		NewSplineMesh->SetCastShadow(false);
+		NewSplineMesh->bCastDynamicShadow = false;
 		NewSplineMesh->SetHiddenInGame(true);
 		NewSplineMesh->SetGenerateOverlapEvents(true);
-		if (IsValid(PlacedMat))
-			NewSplineMesh->SetMaterial(0, PlacedMat);
+
+		if (IsValid(OutLineMat))
+			NewSplineMesh->SetMaterial(0, OutLineMat);
 
 		GeneratedMeshes.Push(NewSplineMesh);
 	}
 
 	SearchBusStop();
-	CalculateTypeSignPosition();
+	SetTypeSignWidgetPosition();
 }
 
 void AOmniCityBlock::SearchBusStop()
@@ -130,12 +158,14 @@ void AOmniCityBlock::SearchBusStop()
 	// todo: cityBlock에서 지우고 탐색할 필요가? 버스 정류장에 일임하는 게 나을 수도 있음. 검토 필요
 	// 범위기반 반복 중, OwnedBusStops이 수정될 수 있어서 임시 객체사용.
 	TArray<TWeakObjectPtr<AOmniStationBusStop>> TempBusStops = OwnedBusStops;
-	for(const auto& BusStop : TempBusStops)
+	for (const TWeakObjectPtr<AOmniStationBusStop>& BusStopWeak : TempBusStops)
 	{
-		BusStop->UnlinkOwnerOmniCityBlock();
+		AOmniStationBusStop* BusStop = BusStopWeak.Get();
+		if (BusStop)
+			BusStop->UnlinkOwnerOmniCityBlock();
 	}
-	
-	for (const auto& OverActor : AllOverlappingActors)
+
+	for (AActor* OverActor : AllOverlappingActors)
 	{
 		if (IsValid(OverActor) == false || OverActor->IsA(BusStopClass) == false)
 			continue;
@@ -146,19 +176,26 @@ void AOmniCityBlock::SearchBusStop()
 	
 }
 
-void AOmniCityBlock::CalculateTypeSignPosition()
+FVector AOmniCityBlock::GetCentroidLocation() const
 {
-	// 외곽선 스플라인 포인트들의 산술평균으로 위치 지정.
-	FVector CenterLocation = FVector::Zero();
+	FVector Centroid = FVector::Zero();
 
 	const int32 SplinePointsSize = BlockOutLine->GetNumberOfSplinePoints();
 	for (int PointIdx = 0; PointIdx < SplinePointsSize; ++PointIdx)
 	{
-		CenterLocation += BlockOutLine->GetLocationAtSplinePoint(PointIdx, ESplineCoordinateSpace::World);
+		Centroid += BlockOutLine->GetLocationAtSplinePoint(PointIdx, ESplineCoordinateSpace::World);
 	}
 
-	CenterLocation /= static_cast<double>(SplinePointsSize);
-	TypeSignWidgetComponent->SetWorldLocation(CenterLocation);
+	Centroid /= static_cast<double>(SplinePointsSize);
+
+	return Centroid;
+}
+
+void AOmniCityBlock::SetTypeSignWidgetPosition()
+{
+	// 외곽선 스플라인 포인트들의 산술평균으로 위치 지정.
+	const FVector CentroidLocation = GetCentroidLocation();
+	TypeSignWidgetComponent->SetWorldLocation(CentroidLocation);
 }
 
 void AOmniCityBlock::SetupBlockDescription(const ECityBlockType InCityBlock)
@@ -202,7 +239,8 @@ void AOmniCityBlock::RemoveBusStop(AOmniStationBusStop* InBusStop)
 		// 해당 버스 정류장 삭제할 때, 유효하지 않은 배열 요소도 같이 제거.
 		OwnedBusStops.RemoveAll([&InBusStop](TWeakObjectPtr<AOmniStationBusStop>& Element)
 		{
-			return (Element == InBusStop) || (Element.IsValid() == false);
+			const AOmniStationBusStop* Stop = Element.Get();
+			return (Stop == InBusStop) || (Stop == nullptr);
 		});
 	}
 }
@@ -212,10 +250,91 @@ void AOmniCityBlock::RemoveInvalidBusStop()
 	// 유효하지 않거나, 연결되지 않은 버스 정류장 제거
 	OwnedBusStops.RemoveAll([this](TWeakObjectPtr<AOmniStationBusStop>& Element)
 	{
-		if (Element.IsValid() == false)
+		const AOmniStationBusStop* Stop = Element.Get();
+		if (Stop == nullptr)
 			return true;
-		if (Element.Get()->GetOwnerOmniCityBlock() != this)
+		if (Stop->GetOwnerOmniCityBlock() != this)
 			return true;
+
 		return false;
 	});
+}
+
+TArray<TWeakObjectPtr<AOmniStationBusStop>> AOmniCityBlock::GetOwnedBusStops()
+{
+	return OwnedBusStops;
+}
+
+TArray<TWeakObjectPtr<AOmniStationBusStop>> AOmniCityBlock::FindNearbyBusStops()
+{
+	TArray<TWeakObjectPtr<AOmniStationBusStop>> NearbyBusStops;
+	NearbyBusStops.Append(OwnedBusStops);
+
+	for (TWeakObjectPtr<AOmniStationBusStop> StopWeak : OwnedBusStops)
+	{
+		// 정류장을 통해 인근 도로 획득
+		const AOmniStationBusStop* OwnedStop = StopWeak.Get();
+		if (OwnedStop == nullptr)
+			continue;
+
+		AOmniRoad* NearbyRoad                                      = OwnedStop->GetOwnerOmniRoad();
+		TArray<TWeakObjectPtr<AOmniStationBusStop>> NearbyStopList = NearbyRoad->GetOwnedBusStops();
+
+		// 인근 도로를 통해, 길 건너 버스 정류장 획득.
+		for (TWeakObjectPtr<AOmniStationBusStop> NearbyStopWeak : NearbyStopList)
+		{
+			const AOmniStationBusStop* NearbyStop = NearbyStopWeak.Get();
+			if (NearbyStop == nullptr)
+				continue;
+
+			if (NearbyStop->GetOwnerOmniCityBlock() != this)
+				NearbyBusStops.Emplace(NearbyStopWeak);
+		}
+	}
+
+	return NearbyBusStops;
+}
+
+FSubSector* AOmniCityBlock::GetSubSector(const int32 InSectorIdx)
+{
+	return SubSectorList.IsValidIndex(InSectorIdx) ? &SubSectorList[InSectorIdx] : nullptr;
+}
+
+bool AOmniCityBlock::IsNeighborBlock(AOmniCityBlock* InOther) const
+{
+	if (IsValid(InOther) == false)
+		return false;
+
+	for (TWeakObjectPtr<AOmniStationBusStop> BusStopWeak : OwnedBusStops)
+	{
+		const AOmniStationBusStop* BusStop = BusStopWeak.Get();
+		if (BusStop == nullptr)
+			continue;
+
+		// 같은 도로를 공유하는 이웃 버스 정류장의 블록이 Other와 같은지 판단.
+		TArray<TWeakObjectPtr<AOmniStationBusStop>> StopNeighborStopList = BusStop->GetNeighborStops();
+		const TWeakObjectPtr<AOmniStationBusStop>* FindPtr = StopNeighborStopList.FindByPredicate([InOther](const TWeakObjectPtr<AOmniStationBusStop>& InNeighborStopWeak)
+		{
+			return InNeighborStopWeak->GetOwnerOmniCityBlock() == InOther;
+		});
+		if (FindPtr != nullptr)
+			return true;
+	}
+
+	return false;
+}
+
+bool AOmniCityBlock::IsNeighborSector(const int32 MySectorIdx, AOmniCityBlock* InOtherBlock, const int32 InOtherSectorIdx) const
+{
+	if (SubSectorList.IsValidIndex(MySectorIdx) == false)
+		return false;
+
+	const FSubSector* OtherSubSector = InOtherBlock->GetSubSector(InOtherSectorIdx);
+	if (OtherSubSector == nullptr)
+		return false;
+
+	const AOmniRoad* MySubSectorRoad    = SubSectorList[MySectorIdx].BusStop->GetOwnerOmniRoad();
+	const AOmniRoad* OtherSubSectorRoad = OtherSubSector->BusStop->GetOwnerOmniRoad();
+
+	return MySubSectorRoad == OtherSubSectorRoad;
 }

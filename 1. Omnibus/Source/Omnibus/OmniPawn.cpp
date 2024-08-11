@@ -1,11 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "OmniPawn.h"
+
+#include "OmnibusGameInstance.h"
 #include "OmnibusUtilities.h"
 
 AOmniPawn::AOmniPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
 	MyOmniID = 0;
 }
 
@@ -18,6 +21,10 @@ void AOmniPawn::OnConstruction(const FTransform& Transform)
 void AOmniPawn::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void AOmniPawn::PostBeginPlay()
+{
 }
 
 void AOmniPawn::Tick(float DeltaTime)
@@ -41,4 +48,29 @@ uint64 AOmniPawn::GetOmniID()
 		SetOmniID();
 
 	return MyOmniID;
+}
+
+UOmnibusGameInstance* AOmniPawn::GetOmniGameInstance() const
+{
+	return GetGameInstance<UOmnibusGameInstance>();
+}
+
+UOmnibusPlayData* AOmniPawn::GetOmnibusPlayData() const
+{
+	return GetOmniGameInstance()->GetOmnibusPlayData();
+}
+
+UOmnibusUIsHandler* AOmniPawn::GetOmnibusUIsHandler() const
+{
+	return GetOmniGameInstance()->GetOmnibusUIsHandler();
+}
+
+AOmnibusRoadManager* AOmniPawn::GetOmnibusRoadManager() const
+{
+	return GetOmniGameInstance()->GetOmnibusRoadManager();
+}
+
+UOmniTimeManager* AOmniPawn::GetOmniTimeManager() const
+{
+	return GetOmniGameInstance()->GetOmniTimeManager();
 }

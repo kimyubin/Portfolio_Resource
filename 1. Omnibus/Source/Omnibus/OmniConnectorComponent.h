@@ -34,7 +34,7 @@ public:
 	 * @param InSplinePointPosition : 스플라인 포인트 위치. 시작인지 끝인지 지정.
 	 * @param InAccessPointIdx : 옴니 로드에서 위치 Idx.
 	 */
-	void SetOwnerOmniRoadAndSpline(AOmniRoad* InOwnerOmniRoad, USplineComponent* InOwnerSpline, const ERoadConnectorPoint InSplinePointPosition, const uint8 InAccessPointIdx );
+	void SetOwnerOmniRoadAndSpline(AOmniRoad* InOwnerOmniRoad, USplineComponent* InOwnerSpline, const ERoadConnectorPoint InSplinePointPosition, const int32 InAccessPointIdx );
 
 	/**
 	 * 상위 옴니 로드 및 컴포넌트가 따라가야하는 스플라인 포인트 위치 추적.
@@ -43,7 +43,7 @@ public:
 	 * @param InSplinePointIdx : 스플라인 포인트 위치. 시작인지 끝인지 지정. ERoadConnectorPoint로 변환함.
 	 * @param InAccessPointIdx : 옴니 로드에서 위치 Idx.
 	 */
-	void SetOwnerOmniRoadAndSpline(AOmniRoad* InOwnerOmniRoad, USplineComponent* InOwnerSpline, const uint32 InSplinePointIdx, const uint8 InAccessPointIdx);
+	void SetOwnerOmniRoadAndSpline(AOmniRoad* InOwnerOmniRoad, USplineComponent* InOwnerSpline, const int32 InSplinePointIdx, const int32 InAccessPointIdx);
 
 	AOmniRoad*          GetOwnerOmniRoad() const;
 	int                 GetSplinePointIdx() const;
@@ -52,9 +52,9 @@ public:
 	/** 부모 스플라인 포인트의 위치와 회전으로 조정 */
 	void    SetRelativeTransformToSpline();
 	
-	FVector GetSplinePointInsideTangent();
-	FVector GetSplinePointInsideTangentNormal();
-	void    ChangeSplineTangentNormal(UOmniConnectorComponent* InTarget) const;
+	FVector GetSplinePointInsideTangent() const;
+	FVector GetSplinePointInsideTangentNormal() const;
+	void    ChangeSplineTangentNormal(const UOmniConnectorComponent* InTarget) const;
 
 	FVector GetSplinePointPos() const;
 	
@@ -64,7 +64,7 @@ public:
 	 */
 	double GetStartPointTangentFactor() const;
 	
-	uint8  GetAccessPointIdx() const { return AccessPointIdx; };
+	int32  GetAccessPointIdx() const { return AccessPointIdx; }
 
 private:
 	TWeakObjectPtr<AOmniRoad>        OwnerOmniRoad;
@@ -74,6 +74,6 @@ private:
 	/** 감지한 OmniRoad의 ID */
 	uint64 DetectedTargetOmniRoadID;
 
-	/** 본 컴포넌트가 저장된 array에서 idx  */
-	uint8 AccessPointIdx;
+	/** 본 컴포넌트가 저장된 리스트 idx  */
+	int32 AccessPointIdx;
 };

@@ -2,11 +2,14 @@
 
 #pragma once
 
+#include <vector>
+
 #include "CoreMinimal.h"
 #include "InputActionValue.h"
 #include "GameFramework/Pawn.h"
 #include "OmniOfficerPawn.generated.h"
 
+class USpectatorPawnMovement;
 class USpringArmComponent;
 class UCameraComponent;
 
@@ -29,6 +32,8 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual UPawnMovementComponent* GetMovementComponent() const override;
+	float GetSpringArmLength() const;
 
 	// 맵 이동 관련
 	void MoveCameraInput(const FInputActionValue& InputValue);
@@ -36,7 +41,8 @@ public:
 	void DragMap(const FVector2D& InMousePosition);
 
 	// 카메라 줌 관련	
-	void ZoomCameraInput(const FInputActionValue& InputValue);
+	void ZoomCameraAtCursor(const FInputActionValue& InputValue);
+	void ZoomCameraCenter(const FInputActionValue& InputValue);
 	void UpdateCameraZoom(const float DeltaTime);
 	float GetDesiredOrthoWidth() const;
 
@@ -48,11 +54,24 @@ public:
 	void SetDefaultPawnLocation(const FVector& TargetPosition);
 
 protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	USpectatorPawnMovement* MovementComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraComponent, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* PlayerCamera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraComponent, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
+
+	/** 최대 이동 속도입니다. 실제 최대 속도는 이 값을 기준으로 화면 너비에 따라 비례해서 정해집니다. */
+	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
+	float CameraMoveSpeed;
+
+	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
+	float Acceleration;
+
+	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
+	float Deceleration;
 
 	/** 줌 속도  */
 	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
@@ -82,5 +101,18 @@ private:
 	FVector2D PrevScrollUnderCursorLocation; // 휠 굴릴 때 커서 아래 위치 임시 저장.
 
 	bool      bDragActive;
-	FVector2D DragStartMouseLocation;		 // 드래그 시작 지점 마우스 위치
+	FVector2D DragStartMouseLocation;        // 드래그 시작 지점 마우스 위치
+
+	/**
+	 * Passenger이 렌더링 되는 줌 스텝의 상한입니다.
+	 * 줌 스텝이 이 값보다 클 경우, Passenger은 렌더링 되지 않습니다. 
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
+	uint8 PassengerVisibilityMaxStep;
+
+	/**
+	 * PassengerVisibilityMaxStep으로 계산된 렌더링 유무를 가르는 직교 너비입니다.
+	 * 직교 너비가 이 값보다 클 경우, Passenger은 렌더링 되지 않습니다.
+	 */
+	float PassengerVisibilityOrthoWidth;
 };

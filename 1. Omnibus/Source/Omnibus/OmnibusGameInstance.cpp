@@ -2,13 +2,18 @@
 
 #include "OmnibusGameInstance.h"
 
+#include "OmniAsync.h"
 #include "Omnibus.h"
 #include "OmnibusUIsHandler.h"
 #include "OmnibusUtilities.h"
 
 #include "OmnibusPlayData.h"
 #include "OmnibusRoadManager.h"
+#include "OmniTimeManager.h"
 #include "Kismet/KismetSystemLibrary.h"
+
+FOmniWorldDelegates::FOnLevelInitialize FOmniWorldDelegates::OnLevelInitialize;
+FOmniWorldDelegates::FOnLevelUninitialize FOmniWorldDelegates::OnLevelUninitialize;
 
 
 UOmnibusGameInstance::UOmnibusGameInstance()
@@ -18,16 +23,31 @@ UOmnibusGameInstance::UOmnibusGameInstance()
 	OmnibusPlayData    = nullptr;
 	OmnibusUIsHandler  = nullptr;
 	OmnibusRoadManager = nullptr;
+	OmniPathFinder     = nullptr;
+	OmniTimeManager    = nullptr;
 }
 
 void UOmnibusGameInstance::Init()
 {
 	Super::Init();
-	GetOmnibusPlayData();
+
+	OmnibusPlayData = NewObject<UOmnibusPlayData>(this, OmnibusPlayDataClass);
+	OmnibusPlayData->Initialize();
+
+	OmnibusUIsHandler = NewObject<UOmnibusUIsHandler>(this, UOmnibusUIsHandler::StaticClass());
+
+	OmniPathFinder = NewObject<UOmniPathFinder>(this);
+	OmniPathFinder->Initialize();
+
+	OmniTimeManager = NewObject<UOmniTimeManager>(this);
+	OmniTimeManager->Initialize(this);
 }
 
 void UOmnibusGameInstance::Shutdown()
 {
+	// PIE 종류, 레벨 전환 등의 상황에서 데이터 초기화 및 Non-GameThread 작업 제거
+	FOmniAsync::ClearDataMapAsync();
+
 	Super::Shutdown();
 }
 
@@ -44,36 +64,39 @@ void UOmnibusGameInstance::LevelInitializer()
 		UKismetSystemLibrary::QuitGame(GetWorld(), nullptr, EQuitPreference::Quit, true);
 	}
 
-	OmnibusUIsHandler = NewObject<UOmnibusUIsHandler>(this, UOmnibusUIsHandler::StaticClass());
+	
+	FOmniWorldDelegates::OnLevelInitialize.Broadcast(this);
 }
 
-void UOmnibusGameInstance::LevelDisposer()
+void UOmnibusGameInstance::LevelUninitializer()
 {
+	FOmniWorldDelegates::OnLevelUninitialize.Broadcast(this);
 }
 
-UOmnibusPlayData* UOmnibusGameInstance::GetOmnibusPlayData()
+UOmnibusPlayData* UOmnibusGameInstance::GetOmnibusPlayData() const
 {
-	if (IsValid(OmnibusPlayData))
-		return OmnibusPlayData;
-
-	OmnibusPlayData = NewObject<UOmnibusPlayData>(this, OmnibusPlayDataClass);
 	return OmnibusPlayData;
 }
 
-UOmnibusUIsHandler* UOmnibusGameInstance::GetOmnibusUIsHandler()
+UOmnibusUIsHandler* UOmnibusGameInstance::GetOmnibusUIsHandler() const
 {
-	if (OB_IS_VALID(OmnibusUIsHandler) == false)
-		return nullptr;
-
 	return OmnibusUIsHandler;
 }
 
 AOmnibusRoadManager* UOmnibusGameInstance::GetOmnibusRoadManager() const
 {
-	if (OB_IS_WEAK_PTR_VALID(OmnibusRoadManager) == false)
-		return nullptr;
-
+	/*ensure(OB_IS_WEAK_PTR_VALID(OmnibusRoadManager))*/
 	return OmnibusRoadManager.Get();
+}
+
+UOmniPathFinder* UOmnibusGameInstance::GetOmniPathFinder() const
+{
+	return OmniPathFinder;
+}
+
+UOmniTimeManager* UOmnibusGameInstance::GetOmniTimeManager() const
+{
+	return OmniTimeManager;
 }
 
 void UOmnibusGameInstance::SetOmnibusRoadManager(AOmnibusRoadManager* InRoadManager)

@@ -6,9 +6,8 @@
 #include "Engine/GameInstance.h"
 #include "OmnibusGameInstance.generated.h"
 
-class UOmnibusPlayData;
-class UOmnibusUIsHandler;
-class AOmnibusRoadManager;
+class UOmniTimeManager;
+class UOmniPathFinder;
 class UOmnibusPlayData;
 class UOmnibusUIsHandler;
 class AOmnibusRoadManager;
@@ -36,17 +35,23 @@ public:
 	void LevelInitializer();
 
 	UFUNCTION(BlueprintCallable)
-	void LevelDisposer();
+	void LevelUninitializer();
 
 	/** OmnibusPlayData 객체 초기화 및 리턴*/
 	UFUNCTION(BlueprintCallable)
-	UOmnibusPlayData* GetOmnibusPlayData();
+	UOmnibusPlayData* GetOmnibusPlayData() const;
 
 	UFUNCTION(BlueprintCallable)
-	UOmnibusUIsHandler* GetOmnibusUIsHandler();
+	UOmnibusUIsHandler* GetOmnibusUIsHandler() const;
 
 	UFUNCTION(BlueprintCallable)
 	AOmnibusRoadManager* GetOmnibusRoadManager() const;
+
+	UFUNCTION(BlueprintCallable)
+	UOmniPathFinder* GetOmniPathFinder() const;
+
+	UFUNCTION()
+	UOmniTimeManager* GetOmniTimeManager() const;
 
 	/**
 	 *  모든 게임플레이 레벨에서 OmnibusRoadManager에 의해 호출되어 초기화 되어야함.
@@ -70,4 +75,23 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AOmnibusRoadManager> OmnibusRoadManager;
+
+	UPROPERTY()
+	UOmniPathFinder* OmniPathFinder;
+
+	UPROPERTY()
+	UOmniTimeManager* OmniTimeManager;
+};
+
+class FOmniWorldDelegates
+{
+public:
+	/** 레벨이 시작 시 호출됩니다. 로드되는 액터가 초기화 완료된 후에 작동합니다. */
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnLevelInitialize, UOmnibusGameInstance*);
+	static FOnLevelInitialize OnLevelInitialize;
+
+	/** 레벨이 종료될 때 호출됩니다. */
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnLevelUninitialize, UOmnibusGameInstance*);
+	static FOnLevelUninitialize OnLevelUninitialize;
+	
 };

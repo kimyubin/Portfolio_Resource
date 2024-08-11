@@ -16,7 +16,6 @@ public class Omnibus : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"UMG",
-			"NavigationSystem",
 			"AIModule"
 		});
 

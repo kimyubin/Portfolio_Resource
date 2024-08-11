@@ -23,10 +23,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 
 	for (int ConnectorIdx = 0; ConnectorIdx < RoadConnectorNum; ++ConnectorIdx)
 	{
-		uint32 RoadIdx;
-		uint32 RoadSplinePointIdx;
-		
-		GetConnectorPositionIdx(ConnectorIdx, RoadIdx, RoadSplinePointIdx);
+		auto [RoadIdx, RoadSplinePointIdx] = GetConnectorPositionIdx(ConnectorIdx);
 
 		if (RoadSplines.IsValidIndex(RoadIdx) == false)
 		{
@@ -43,17 +40,25 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 		InitLaneSpline(i, GetRoadSpline(i / 6));
 	}
 
-	const FName Mesh = OmniStr::ConcatStrInt("Flat4WayMesh", 0);
+	const FName Mesh = OmniStr::ConcatStrInt(TEXT("Flat4WayMesh"), 0);
 	Flat4WayMesh     = CreateDefaultSubobject<UStaticMeshComponent>(Mesh);
 	Flat4WayMesh->SetupAttachment(RootComponent);
+	Flat4WayMesh->SetMobility(EComponentMobility::Static);
+	Flat4WayMesh->SetCastShadow(false);
+
+	TangentSizeRate = 2.0f;
 }
 
 void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	if (OB_IS_VALID(PlacedMesh))
+	{
 		Flat4WayMesh->SetStaticMesh(PlacedMesh);
-	
+		Flat4WayMesh->SetMobility(EComponentMobility::Static);
+		Flat4WayMesh->SetCastShadow(false);
+	}
+
 	SetLanePoints();
 	SetSplinesTransform();
 }
@@ -106,16 +111,16 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 			Connector->SetRelativeTransformToSpline();
 	}
 
-	const uint32 LaneMaxIdx = LaneSplineNum / 3; // 12/3 = 4
+	const int32 LaneMaxIdx = LaneSplineNum / 3; // 12/3 = 4
 
-	for (uint32 i = 0; i < LaneMaxIdx; ++i)
+	for (int32 i = 0; i < LaneMaxIdx; ++i)
 	{
 		const int LaneIdx  = i * 3; // 4개 방향 출발지 마다 3개 차선씩(좌,우회전, 직진 차선). 차선 12개. 3개 묶어서 계산.
 		const int PointIdx = i * 2; // 4개 방향 마다 출입로 2개씩 진출입 포인트 총 8개. 그 중 진입로는 번갈아가면서 등장하므로 건너뜀(2칸).
 
-		const uint32 EndLeftPointIdx     = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx + 3);   // 좌회전 - 시계 방향으로 3칸 후.
-		const uint32 EndStraightPointIdx = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 3);   // 직진 - 시계 방향으로 3칸 전.
-		const uint32 EndRightPointIdx    = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 1);   // 우회전 - 시계 방향으로 1칸 전.
+		const int32 EndLeftPointIdx     = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx + 3);   // 좌회전 - 시계 방향으로 3칸 후.
+		const int32 EndStraightPointIdx = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 3);   // 직진 - 시계 방향으로 3칸 전.
+		const int32 EndRightPointIdx    = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 1);   // 우회전 - 시계 방향으로 1칸 전.
 		check(LanePoints.IsValidIndex(EndLeftPointIdx))
 		check(LanePoints.IsValidIndex(EndStraightPointIdx))
 		check(LanePoints.IsValidIndex(EndRightPointIdx))
@@ -125,10 +130,9 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 		const FVector EndStraightPoint = LanePoints[EndStraightPointIdx];
 		const FVector EndRightPoint    = LanePoints[EndRightPointIdx];
 
-		//각 변을 4등분. 좌회전은 전방 3/4 지점, 우회전은 전방 1/4 지점. 탄젠트 크기는 실제 위치보다 2배.
 		FVector      StartTangentNormal = (EndStraightPoint - StartPoint).GetSafeNormal();
-		const double LeftTangentSize    = (RoadWidth / 4.0) * 3.0 * 2.0;
-		const double RightTangentSize   = (RoadWidth / 4.0) * 2.0;
+		const double LeftTangentSize    = (RoadWidth / 4.0) * 3.0 * TangentSizeRate;
+		const double RightTangentSize   = (RoadWidth / 4.0) * TangentSizeRate;
 
 		TArray<FVector> EndPoints    = {EndLeftPoint, EndStraightPoint, EndRightPoint};
 		TArray<double>  TangentSizes = {LeftTangentSize, RoadWidth, RightTangentSize};
@@ -138,14 +142,15 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 			if (OB_IS_VALID(LaneSpline) == false)
 				continue;
 
-			FVector StartTangent = StartTangentNormal * TangentSizes[EndPointIdx];
+			// 탄젠트를 상대 위치 취급.
+			// 시작 탄젠트를 위치로 치환 후, EndPoint에서의 상대 위치를 탄젠트로 변환.
+			FVector StartTangent         = StartTangentNormal * TangentSizes[EndPointIdx];
+			FVector StartTangentLocation = StartPoint + StartTangent / TangentSizeRate;
+			FVector EndPointTangent      = (StartTangentLocation - EndPoints[EndPointIdx]) * -TangentSizeRate;
+
 			LaneSpline->SetLocationAtSplinePoint(0, StartPoint, CoordSpace);
 			LaneSpline->SetLocationAtSplinePoint(1, EndPoints[EndPointIdx], CoordSpace);
 			LaneSpline->SetTangentAtSplinePoint(0, StartTangent, CoordSpace);
-
-			FVector EndPointTangent_RelativeLocation = StartPoint + StartTangent / 2 - EndPoints[EndPointIdx];
-			FVector EndPointTangent                  = EndPointTangent_RelativeLocation * -2.0;
-
 			LaneSpline->SetTangentAtSplinePoint(1, EndPointTangent, CoordSpace);
 		}
 	}
@@ -171,15 +176,19 @@ void AOmniRoadIntersectionFlat4Way::SetLanePoints()
 				};
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const uint32 ApproachIdx, const uint8 LaneDirection) const
+int32 AOmniRoadIntersectionFlat4Way::CalculateLaneIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
 {
-	const uint32 LaneMaxIdx = LaneSplineNum / 4; // 12/4 = 3, 0~3
-	const uint32 LandIdx    = OmniMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
-	
-	return GetLaneSpline(LandIdx);
+	const int32 LaneMaxIdx = LaneSplineNum / 4; // 12/4 = 3, 0~3
+	const int32 LaneIdx    = OmniMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
+	return LaneIdx;
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const uint32 ApproachIdx, const ERoadDirection& LaneDirection) const
+USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
+{
+	return GetLaneSpline(CalculateLaneIdx(ApproachIdx, LaneDirection));
+}
+
+USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const ERoadDirection& LaneDirection) const
 {
 	return GetLaneByApproachIdx(ApproachIdx, EnumToInt(LaneDirection));
 }
@@ -217,23 +226,32 @@ FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensi
 	return Result;
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetSplineToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+AOmniRoad* AOmniRoadIntersectionFlat4Way::GetNextRoadByLaneIdx(const int32 InLaneIdx)
 {
-	if ( OB_IS_VALID(InPrevRoad) && OB_IS_VALID(InNextTargetRoad))
+	// (진입도로 번호) 좌 직 우 // 진출 순서임.
+	// (0) 1 2 3 (1) 2 3 0 (2) 3 0 1 (3) 0 1 2
+	const std::vector<int32> LaneToRoad = {1, 2, 3, 2, 3, 0, 3, 0, 1, 0, 1, 2};
+	return GetConnectedRoad(LaneToRoad[InLaneIdx]);
+}
+
+int32 AOmniRoadIntersectionFlat4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+{
+	// 같은 경우, 잘못된 입력.
+	if ((InPrevRoad != InNextTargetRoad) && OB_IS_VALID(InPrevRoad) && IsValid(InNextTargetRoad))
 	{
 		const int PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
 		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
 		if (PrevRoadIdx != INDEX_NONE && NextRoadIdx != INDEX_NONE)
 		{
 			const ERoadDirection Direction = (GetLaneDirectionByConnectedIdx(PrevRoadIdx, NextRoadIdx));
-			return GetLaneByApproachIdx(PrevRoadIdx, Direction);
+			return CalculateLaneIdx(PrevRoadIdx, EnumToInt(Direction));
 		}
 	}
 
-	return nullptr;
+	return INDEX_NONE;
 }
 
-void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const uint8 InAccessIdx)
+void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const int32 InAccessIdx)
 {
 	if (OB_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
 	{
@@ -244,7 +262,7 @@ void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, co
 	}
 }
 
-ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(const uint32 StartLaneApproachIdx, const uint32 TargetRoadIdx) const
+ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(const int32 StartLaneApproachIdx, const int32 TargetRoadIdx) const
 {
 	check(ConnectedRoadsArray.IsValidIndex(TargetRoadIdx))
 
@@ -269,7 +287,7 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	return Direction;
 }
 
-void AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const uint32 InConnectorIdx, uint32& OutRoadIdx, uint32& OutSplinePointIdx)
+std::tuple<int32, int32> AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const int32 InConnectorIdx)
 {
 	/**
      * RoadConnectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
@@ -278,7 +296,7 @@ void AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const uint32 InConne
      * 3     1 => 2     3 => 1-0     1-1
      *    2          1           0-1
 	 */
-	uint32 RoadPointIdx = InConnectorIdx;
+	int32 RoadPointIdx = InConnectorIdx;
 	switch (InConnectorIdx)
 	{
 		case 0: RoadPointIdx = 0; break;
@@ -289,7 +307,6 @@ void AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const uint32 InConne
 	}
 
 	// 몫==도로 번호, 나머지==SplinePoint
-	auto [quot, rem]  = std::div(RoadPointIdx, 2);
-	OutRoadIdx        = quot;
-	OutSplinePointIdx = rem;
+	auto [RoadIdx, SplinePointIdx] = std::div(RoadPointIdx, 2);
+	return std::make_tuple(RoadIdx, SplinePointIdx);
 }

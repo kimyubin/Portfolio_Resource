@@ -2,9 +2,11 @@
 
 #include "OmnibusUtilities.h"
 
+#include <chrono>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <bitset>
 
 #include "OmnibusTypes.h"
 #include "Omnibus.h"
@@ -12,6 +14,11 @@
 #include "Framework/Notifications/NotificationManager.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Widgets/Notifications/SNotificationList.h"
+
+#if WITH_EDITOR
+#include "Components/TextRenderComponent.h"
+#include "Engine/TextRenderActor.h"
+#endif // WITH_EDITOR
 
 std::atomic<uint64> UOmniID::ID_TodayCountAtomic = 0;
 uint64 FOmniTime::LevelStartTime_Sec = 0;
@@ -26,6 +33,36 @@ void OmniMsg::ToastMsg(const FString& InMsg)
 	const FText MsgTxt = FText::FromString(InMsg);
 	const FNotificationInfo ErrorNotification(MsgTxt);
 	FSlateNotificationManager::Get().AddNotification(ErrorNotification);
+}
+
+ATextRenderActor* SimpleTextRender(const FVector& InLocation, const float InLifeSpan, const FString& InText, const float InWorldSize, const double InZOffset/* = 10*/, const FColor& InRenderColor/* = FColor::Red*/)
+{
+#if WITH_EDITOR
+	UWorld* World;
+
+	if (GIsEditor)
+	{
+		World = GWorld;
+	}
+	else
+	{
+		World = GEngine ? GEngine->GetWorldContexts()[0].World() : nullptr;
+	}
+	OB_IF(World == nullptr)
+		return nullptr;
+
+	ATextRenderActor* TextRender = World->SpawnActor<ATextRenderActor>(ATextRenderActor::StaticClass(), InLocation + FVector(0, 0, InZOffset), FRotator(90.0, 0.0, 0.0));
+	TextRender->SetLifeSpan(InLifeSpan);
+	TextRender->GetTextRender()->SetText(FText::FromString(InText));
+	TextRender->GetTextRender()->SetWorldSize(InWorldSize);
+	TextRender->GetTextRender()->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);
+	TextRender->GetTextRender()->SetVerticalAlignment(EVerticalTextAligment::EVRTA_TextCenter);
+	TextRender->GetTextRender()->SetTextRenderColor(InRenderColor);
+
+	return TextRender;
+#else
+	return nullptr;
+#endif // WITH_EDITOR
 }
 
 uint64 UOmniID::GenerateID_Number(const AActor* InActor)
@@ -103,7 +140,7 @@ uint64 UOmniID::GenerateID_NumberByHash(const AActor* InActor)
 
 	const int64 InActorLocationX = FMath::RoundHalfToEven(InActor->GetActorLocation().X / FOmniConst::Unit_Length);
 	const int64 InActorLocationY = FMath::RoundHalfToEven(InActor->GetActorLocation().Y / FOmniConst::Unit_Length);
-	FString HashSource = FString::Printf(TEXT("%s_%lld_%lld"), *InActor->GetName(), InActorLocationX, InActorLocationY);
+	const FString HashSource     = FString::Printf(TEXT("%s_%lld_%lld"), *InActor->GetName(), InActorLocationX, InActorLocationY);
 
 	constexpr std::hash<std::string> Hasher;
 	return Hasher(TCHAR_TO_ANSI(*HashSource));
@@ -111,20 +148,20 @@ uint64 UOmniID::GenerateID_NumberByHash(const AActor* InActor)
 
 std::string UOmniID::GetID_InfoToString(const uint64 InID)
 {
-	const int x         = OmniBit::GetSignedBitRange(InID, 0, 24) * FOmniConst::Unit_Length;;
-	const int y         = OmniBit::GetSignedBitRange(InID, 24, 24) * FOmniConst::Unit_Length;;
+	const int x         = OmniBit::GetSignedBitRange(InID, 0, 24) * FOmniConst::Unit_Length;
+	const int y         = OmniBit::GetSignedBitRange(InID, 24, 24) * FOmniConst::Unit_Length;
 	const int ActorType = OmniBit::GetSignedBitRange(InID, 48, 16);
 	
 	return "X: " + std::to_string(x) + ", Y: " + std::to_string(y) + ", Level Type: " + std::to_string(ActorType);
 }
 
-FName OmniStr::ConcatStrInt(const std::string& InNameString, const int32 InIdx)
+FName OmniStr::ConcatStrInt(const FString& InNameString, const int32 InIdx)
 {
 	std::ostringstream oss;
 	oss << std::setw(2) << std::setfill('0') << InIdx;
-	const std::string TwoDigitIdxStr = oss.str();
+	const FString TwoDigitIdxStr = oss.str().c_str();
 
-	return FName((InNameString + "_" + TwoDigitIdxStr).c_str());
+	return FName(InNameString + "_" + TwoDigitIdxStr);
 }
 
 FString OmniStr::EnumToString(const ECityBlockType InBlockType)
@@ -156,19 +193,19 @@ uint32 OmniMath::CircularNum(const uint32 InMax, const int64 InNum)
 	// InMax를 범위에 포함하기 위해 1 더함.
 	const int64 MaxOutLine = static_cast<int64>(InMax) + 1;
 	if (InNum < 0)
-		return (InNum % MaxOutLine) + MaxOutLine;
+		return ((InNum % MaxOutLine) + MaxOutLine) % MaxOutLine;
 	else if (InNum <= InMax)
 		return InNum;
-		
+
 	return InNum % MaxOutLine;
 }
 
 double OmniMath::CircularNumF(const double InMax, const double InNum)
 {
-	// InMax를 범위에 포함하기 위해 1 더함.
-	const double MaxOutLine = InMax + 1.0;
+	// 1더하지 않아도, InMax는 경계에 포함
+	const double MaxOutLine = InMax;
 	if (InNum < 0)
-		return fmod(InNum, MaxOutLine) + MaxOutLine;
+		return fmod(fmod(InNum, MaxOutLine) + MaxOutLine, MaxOutLine);
 	else if (InNum <= InMax)
 		return InNum;
 	
@@ -198,6 +235,18 @@ uint64 FOmniTime::GetNowTime_Sec()
 {
 	const FDateTime NowTime = FDateTime::Now();
 	return static_cast<uint64>(NowTime.GetSecond() + NowTime.GetMinute() * 60 + NowTime.GetHour() * 3600);
+}
+
+int64 FOmniTime::GetNowMicroSec()
+{
+	return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+void FOmniTime::SimpleTimer(const AActor* InWorldActor, const float InRate, TFunction<void()>&& Callback)
+{
+	FTimerHandle TempTimer;
+
+	InWorldActor->GetWorldTimerManager().SetTimer(TempTimer, MoveTemp(Callback), InRate, false);
 }
 
 bool FOmniStatics::GetOverlapComps(UPrimitiveComponent* InTestComp, UClass* InComponentClassFilter, TArray<UPrimitiveComponent*>& OutOverlapComps)
@@ -376,11 +425,31 @@ double OmniMath::GetBoxWidth(const FBox& InBox)
 double OmniMath::RoundHalfToEvenByUnitValue(const double InDouble, const double InUnitValue /*= 1.0*/)
 {
 	return FMath::RoundHalfToEven(InDouble / InUnitValue) * InUnitValue;
-};
+}
 
 FVector OmniMath::RoundHalfToEvenVector(const FVector& InVector, const double InUnitValue /*= 1.0*/)
 {
 	return FVector(RoundHalfToEvenByUnitValue(InVector.X, InUnitValue)
 	             , RoundHalfToEvenByUnitValue(InVector.Y, InUnitValue)
 	             , RoundHalfToEvenByUnitValue(InVector.Z, InUnitValue));
-};
+}
+
+FString OmniMath::ToHex(const uint64 InInt)
+{
+	return FString::Printf(TEXT("%16llx"), InInt);
+}
+
+FString OmniMath::ToHex(const uint32 InInt)
+{
+	return FString::Printf(TEXT("%8lx"), InInt);
+}
+
+FString OmniMath::ToBin(const uint64 InInt)
+{
+	return std::bitset<64>(InInt).to_string().c_str();
+}
+
+FString OmniMath::ToBin(const uint32 InInt)
+{
+	return std::bitset<32>(InInt).to_string().c_str();
+}

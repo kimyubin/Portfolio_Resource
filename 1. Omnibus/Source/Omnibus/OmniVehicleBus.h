@@ -3,10 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "OmnibusTypes.h"
 #include "OmniPawn.h"
 #include "GameFramework/Pawn.h"
 #include "OmniVehicleBus.generated.h"
 
+class ATextRenderActor;
+struct FTransferStep;
+class AOmniPassenger;
+struct FBusStopDistance;
+class AOmniStationBusStop;
 class AOmniLineBusRoute;
 class UTextRenderComponent;
 class UBoxComponent;
@@ -32,32 +38,69 @@ public:
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-	void SetupSpawnInit(AOmniLineBusRoute* InOuterRoute);
+	/**
+	 * 스폰 후 필요한 정보를 초기화합니다.
+	 * 
+	 * @param InOwnerRoute 노선
+	 * @param InSpawnCarType 
+	 * @param InSpawnRouteDist 최초 스폰된 위치 정보를 노선의 Dist로 받습니다. 이번 정류장과 CurrentRouteDist는 이 값으로 계산된 후 초기화됩니다.
+	 * @see FindThisStopIdxByDist
+	 */
+	void SetupSpawnInit(AOmniLineBusRoute* InOwnerRoute, const ECarType InSpawnCarType, const float InSpawnRouteDist);
+
+	/** 정류장에 정차 후 승차 시작 */
+	void StartBoarding();
+	void EndBoarding();
+
+	/** 승객 탑승 */
+	FTransform EntryToBus(AOmniPassenger* InPassenger);
+
+	/**
+	 * 이 버스는 이 경로로 갈 수 있나요?
+	 * @InStep과 같은 경로로 가는 다른 버스임을 판단합니다.
+	 * 이번 승차 시점에서 이 버스가 해당 경로로 가고 있는지 확인합니다.(2회 이상 동일 정류장에 정차하는 것을 고려)
+	 * 
+	 * @param InStep 이번 운행과 비교하고 싶은 환승 경로 
+	 * @return 같은 시간
+	 */
+	bool HasSameTransStep(const FTransferStep& InStep) const;
+	
+	TWeakObjectPtr<AOmniLineBusRoute> GetOwnerBusRouteWeak() const { return OwnerBusRoute; }
+
+	/** 입력된 위치에서 가장 가까운 버스노선 스플라인의 위치를 Distance로 반환 */
+	float GetNearestRouteDistance(const FVector& InLocation) const;
 
 protected:
-	void DriveToDestination(const float DeltaTime);
+	/** 실질적인 주행을 담당합니다. */
+	void DriveOnBusLine(const float DeltaTime);
 
-	/** 노선 스플라인의 현재 목표 가져오기*/
-	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	FVector GetTargetPointFromRouteSpline(const float DeltaTime);
+	/** 노선에서의 현재 위치 Dist(CurrentRouteDistance)를 업데이트합니다. */
+	void UpdateCurrentRouteDist(const float DeltaTime);
+
+	/** 노선 위에서 CurrentRouteDistance의 위치를 반환합니다. */
+	FVector GetCurrentRouteLocation() const;
 
 	/** 노선 스플라인의 현재 목표를 바라보는 회전 가져오기*/
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	FRotator GetRotationToTarget(const FVector InTargetPos) const;
+	FRotator GetLookAtDeltaRotation(const FVector InTargetPos) const;
 
-	/** 추적 대상 따라가는 속도*/
+	/** 노선 위의 가상의 추적 대상(CurrentRouteDistance)과의 간격에 맞춰, 버스의 주행 최대 속도를 설정합니다. */
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
 	void SetBusSpeed(const FVector InTargetPos);
 
+	USplineComponent* GetOwnerRouteSpline() const;
+	float GetOwnerRouteLength() const;
+
+	/** ThisStopIndex를 바탕으로 이번 정류장의 FBusStopDistance를 가져옵니다. */
+	FBusStopDistance GetThisStopDist() const;
+
+	int32 GetThisStopIndex() const { return ThisStopIndex; };
+
 public:
-	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	void SetDriveMaxSpeed(const double InMaxSpeed = 1200.0);
+	float GetExitSpeed() const { return CarSpec.ExitSpeed; }
 
 	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	void SetDriveAcceleration(const double InAcceleration = 1200.0);
-
-	UFUNCTION(BlueprintCallable, Category = "BusVehicle")
-	void SetDriveDeceleration(const double InDeceleration = 12000.0);
+	void SetDriveMaxSpeed(const float InMaxSpeed = 1200.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	USpectatorPawnMovement* PawnMovement;
@@ -70,32 +113,51 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	UBoxComponent* ForwardSensingBoxComponent;
 
+	/** 버스가 소속된 노선 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	TWeakObjectPtr<AOmniLineBusRoute> OwnerBusRoute;
+
+	/** 버스 탑승자 목록 */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	TArray<TWeakObjectPtr<AOmniPassenger>> PassengerList;
+
+	/** 버스의 종류와 주행 관련 수치를 보관합니다. */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	FCarSpec CarSpec;
+
 	/**
-	 * 선회할 때 바라보는 거리.
-	 * 값이 클수록 먼 거리에 있는 스플라인을 확인해서 미리 회전하고,
-	 * 값이 작을 수록 바로 앞의 스플라인을 따라감.
-	 * 끊긴 구간보다 값이 크면 자연스럽게 넘어감.
-	 * 끊긴 구간보다 값이 작으면 마지막 지점에서 제자리 회전함.
+	 * 노선 위의 가상의 목표와의 거리 
+	 * 버스는 버스 노선 위의 가상의 목표를 따라갑니다.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	double SteeringDistance;
+	float SteeringDistance;
 
-	/** 노선 위에서 움직이는 추적 대상의 이동 속도. PawnMovement->MaxSpeed 초기화됨 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	double RouteTargetMoveSpeed;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TWeakObjectPtr<AOmniLineBusRoute> MyBusRoute;
+	/** 이번에 내릴 정류장의 노선 내부 인덱스. */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	int32 ThisStopIndex;
 
-	/** 현재 추적하고 있는 노선 Spline의 거리(distance). beginPlay에서 가장 가까운 InputKey로 초기화됨. */
+	/** 현재 추적하고 있는 노선 Spline의 지점을 나타내는 거리(distance). */
 	float CurrentRouteDistance;
 
-	/** 스플라인 위치 이동 속도. 곡선에서 느려짐. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	double NowRouteSpeed;
+	/** 스플라인 위치 이동 속도. */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	float NowRouteSpeed;
 
+	/** 정류장에 진입중 */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	bool bEnterDecelArea;
+
+	/** 정류장 앞에 완전히 멈춰서 승하차 중 */
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	bool bBoarding;
+
+#if WITH_EDITORONLY_DATA
 	// 디버그 확인용
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	double NowBusSpeed;
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	double DebugBusSpeed;
 
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	TWeakObjectPtr<ATextRenderActor> BusLineTargetTextRender;
+
+#endif //WITH_EDITORONLY_DATA
 };

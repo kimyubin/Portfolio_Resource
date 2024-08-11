@@ -3,7 +3,6 @@
 
 #include "OmnibusGameModeBase.h"
 
-#include "Omnibus.h"
 #include "OmnibusPlayerController.h"
 #include "OmniOfficerPawn.h"
 #include "Blueprint/UserWidget.h"

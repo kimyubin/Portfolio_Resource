@@ -73,3 +73,8 @@ AOmnibusRoadManager* AOmniActor::GetOmnibusRoadManager() const
 {
 	return GetOmniGameInstance()->GetOmnibusRoadManager();
 }
+
+UOmniTimeManager* AOmniActor::GetOmniTimeManager() const
+{
+	return GetOmniGameInstance()->GetOmniTimeManager();
+}
