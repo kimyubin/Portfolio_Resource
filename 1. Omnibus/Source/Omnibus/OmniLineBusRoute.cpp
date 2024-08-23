@@ -553,14 +553,14 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 
 	// 두 차선의 직전 구간 길이의 평균에서 차선 간격(절반)만큼 후퇴.
 	// 평균에서 후퇴한 비율을 좌우 차선에 대입해서 후퇴. 해당 지점에서 U턴.
-	const double HalfLaneSpacing    = (StartPointPos - EndPointPos).Length() / 2.0;
-	const double StartSectionDist   = std::abs(StartPointDist - PrevStartPointDist);
-	const double EndSectionDist     = std::abs(EndPointDist - NextEndPointDist);
-	const double AvgSectionDist     = (StartSectionDist + EndSectionDist) / 2.0;
-	const double AvgSpacingRate     = HalfLaneSpacing / AvgSectionDist; // 평균 길이 대비, 차선 간격이 차지하는 비율 
-	const double AvgBackRate        = 1 - AvgSpacingRate;               // 변화율
-	const double TurnStartPointDist = StartPointDist - (StartSectionDist * AvgSpacingRate);
-	const double TurnEndPointDist   = EndPointDist + (EndSectionDist * AvgSpacingRate);
+	const float HalfLaneSpacing    = static_cast<float>((StartPointPos - EndPointPos).Length()) / 2.0f;
+	const float StartSectionDist   = std::abs(StartPointDist - PrevStartPointDist);
+	const float EndSectionDist     = std::abs(EndPointDist - NextEndPointDist);
+	const float AvgSectionDist     = (StartSectionDist + EndSectionDist) / 2.0;
+	const float AvgSpacingRate     = HalfLaneSpacing / AvgSectionDist; // 평균 길이 대비, 차선 간격이 차지하는 비율 
+	const float AvgBackRate        = 1 - AvgSpacingRate;               // 변화율
+	const float TurnStartPointDist = StartPointDist - (StartSectionDist * AvgSpacingRate);
+	const float TurnEndPointDist   = EndPointDist + (EndSectionDist * AvgSpacingRate);
 
 	// 변경할 위치. Tangent는 변경 전 접선의 기울기
 	const FVector TurnStartPointPos     = RouteSpline->GetLocationAtDistanceAlongSpline(TurnStartPointDist, CoordSpace);
@@ -573,7 +573,7 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 
 	// 좌회전(U턴) 방향에 수직 방향(시계방향 회전. 직진방향)  
 	const FVector StartToEndNormal = (TurnEndPointPos - TurnStartPointPos).GetSafeNormal();
-	const FVector TurnTangent      = FVector(StartToEndNormal.Y, -StartToEndNormal.X, StartToEndNormal.Z) * HalfLaneSpacing * 4;
+	const FVector TurnTangent      = FVector(StartToEndNormal.Y, -StartToEndNormal.X, StartToEndNormal.Z) * (HalfLaneSpacing * 4.0);
 
 	RouteSpline->SetTangentsAtSplinePoint(InStartPoint, TurnStartPointTangent, -1 * TurnTangent   , CoordSpace);
 	RouteSpline->SetTangentsAtSplinePoint(InEndPoint  , TurnTangent          , TurnEndPointTangent, CoordSpace);

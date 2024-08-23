@@ -82,7 +82,9 @@ void AOmniOfficerPawn::InitSettings()
 {
 	CurrentZoomStep = FMath::Clamp(StartZoomStep, 0, MaxZoomStep);
 
-	// 줌단계만큼의 제곱근을 구함. MinOrthoWidth * (StepIntervalRate^n(0~MaxZoomStep)) = MaxOrthoWidth
+	// 단계별 증가율의 기하평균. (전체 증가율의 n제곱근(줌단계))
+	// MinOrthoWidth * (StepIntervalRate^(MaxZoomStep)) = MaxOrthoWidth
+	// 확대 축소 비율을 동일하게 하기 위함.
 	const float StepIntervalRate = pow(MaxOrthoWidth / MinOrthoWidth, 1.0 / static_cast<float>(MaxZoomStep));
 
 	OrthoWidths.clear();
@@ -96,7 +98,7 @@ void AOmniOfficerPawn::InitSettings()
 	
 	PlayerCamera->OrthoWidth = GetDesiredOrthoWidth();
 
-	// Passenger 렌더링 기준 계산
+	// Passenger 렌더링 기준 단계 계산
 	OB_LIGHT_CHECK(PassengerVisibilityMaxStep < OrthoWidths.size() - 1, "PassengerVisibilityMaxStep is too big. Step must be less than %llu.", (OrthoWidths.size() - 1))
 
 	PassengerVisibilityMaxStep    = FMath::Clamp(PassengerVisibilityMaxStep, 0, OrthoWidths.size() - 2);

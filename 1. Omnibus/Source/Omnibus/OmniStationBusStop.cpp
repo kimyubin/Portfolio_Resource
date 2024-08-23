@@ -295,12 +295,12 @@ void AOmniStationBusStop::StartEntryToBus(AOmniVehicleBus* InBus)
 		return false;
 	});
 
-	const float BusExitSpeed = InBus->GetExitSpeed();
-
+	// 단위 승차 시간(하차 속도의 역수)
+	const float UnitEntryDelay = 1.0f / InBus->GetExitSpeed();
 	for (int idx = 0; idx < EntryPassengerList.Num(); ++idx)
 	{
 		// 각각 일정 시간 간격으로 승차 절차 밟음.
-		const float EntryDelay = static_cast<float>(idx + 1) / BusExitSpeed;
+		const float EntryDelay = static_cast<float>(idx + 1) * UnitEntryDelay;
 
 		AOmniPassenger* ExitPassenger = EntryPassengerList[idx];
 		ExitPassenger->DoEntryToBus(InBus, EntryDelay);
@@ -313,7 +313,7 @@ void AOmniStationBusStop::StartEntryToBus(AOmniVehicleBus* InBus)
 	}
 	else
 	{
-		const float EntryTime = static_cast<float>(EntryPassengerList.Num() + 1) / BusExitSpeed;
+		const float EntryTime = static_cast<float>(EntryPassengerList.Num() + 1) * UnitEntryDelay;
 		FTimerHandle TempTimer;
 		GetWorldTimerManager().SetTimer(TempTimer, [InBus]()
 		{

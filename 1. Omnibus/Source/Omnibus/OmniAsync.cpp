@@ -106,6 +106,9 @@ void UOmniPathFinder::CompleteAbortRequest(const TQueryID InAbortID)
 
 void UOmniPathFinder::PerformPathFindingAsync()
 {
+	if (RetryPathFindingQueryList.IsEmpty() && PathFindingQueryList.IsEmpty())
+		return;
+
 	static FAutoConsoleTaskPriority CPrio_PerformPathFindingAsync(
 		TEXT("TaskGraph.TaskPriorities.PerformPathFindingAsync"),
 		TEXT("Task and thread priority for UOmniPathFinder::PerformPathFindingAsync."),
@@ -113,9 +116,6 @@ void UOmniPathFinder::PerformPathFindingAsync()
 		ENamedThreads::NormalTaskPriority,         // .. at normal task priority
 		ENamedThreads::NormalTaskPriority          // if we don't have background threads, then use normal priority threads at normal task priority instead
 	);
-
-	if (RetryPathFindingQueryList.IsEmpty() && PathFindingQueryList.IsEmpty())
-		return;
 
 	// 재시도 쿼리부터 시행
 	RetryPathFindingQueryList.Append(MoveTemp(PathFindingQueryList));
@@ -463,43 +463,35 @@ void FOmniAsync::DeliverDataMapAsync()
 	if (StopUpdateQueue.IsEmpty() && LineUpdateQueue.IsEmpty() && StopDeleteQueue.IsEmpty() && LineDeleteQueue.IsEmpty())
 		return;
 
-	// 복사를 줄이기 위해 SharedPtr 사용.
-	TSharedPtr<TWeakPairArray<AOmniStationBusStop, FStopData>> StopDataListSharedPtr = MakeShared<TWeakPairArray<AOmniStationBusStop, FStopData>, ESPMode::ThreadSafe>();
-	TSharedPtr<TWeakPairArray<AOmniLineBusRoute, FLineData>> LineDataListSharedPtr   = MakeShared<TWeakPairArray<AOmniLineBusRoute, FLineData>, ESPMode::ThreadSafe>();
+	// 복사를 줄이기 위해 TUniquePtr 사용.
+	TUniquePtr<TWeakPairArray<AOmniStationBusStop, FStopData>> StopDataUniquePtr = MakeUnique<TWeakPairArray<AOmniStationBusStop, FStopData>>();
+	TUniquePtr<TWeakPairArray<AOmniLineBusRoute, FLineData>> LineDataUniquePtr   = MakeUnique<TWeakPairArray<AOmniLineBusRoute, FLineData>>();
 
 	// 업데이트 목록으로 데이터 생성
 	for (TWeakObjectPtr<AOmniStationBusStop>& UpdateStopWeak : StopUpdateQueue)
 	{
-		const AOmniStationBusStop* UpdateStop = UpdateStopWeak.Get();
-
-		if (UpdateStop == nullptr)
-			continue;
-
-		StopDataListSharedPtr.Get()->Emplace(UpdateStopWeak, FStopData{UpdateStop->GetBusRouteList(), FVector2D(UpdateStop->GetActorLocation())});
+		if (const AOmniStationBusStop* UpdateStop = UpdateStopWeak.Get())
+			StopDataUniquePtr.Get()->Emplace(UpdateStopWeak, FStopData{UpdateStop->GetBusRouteList(), FVector2D(UpdateStop->GetActorLocation())});
 	}
 	for (TWeakObjectPtr<AOmniLineBusRoute>& UpdateLineWeak : LineUpdateQueue)
 	{
-		const AOmniLineBusRoute* UpdateLine = UpdateLineWeak.Get();
-
-		if (UpdateLine == nullptr)
-			continue;
-
-		LineDataListSharedPtr.Get()->Emplace(UpdateLineWeak, FLineData{UpdateLine->GetBusStopDistanceList(), UpdateLine->GetRouteLength()});
+		if (const AOmniLineBusRoute* UpdateLine = UpdateLineWeak.Get())
+			LineDataUniquePtr.Get()->Emplace(UpdateLineWeak, FLineData{UpdateLine->GetBusStopDistanceList(), UpdateLine->GetRouteLength()});
 	}
 
 	// Wait하지 않기 위해, 다른 스레드에서 데이터 업데이트. 즉시 업데이트를 위해 비교적 높은 우선순위 쓰레드 사용.
 	// 삭제 데이터는 목록만 필요하기 때문에 이동처리.
-	AsyncTask(ENamedThreads::AnyHiPriThreadNormalTask, [LineDataListSharedPtr, StopDataListSharedPtr, DeleteLineList = MoveTemp(LineDeleteQueue), DeleteStopsList = MoveTemp(StopDeleteQueue)]() mutable
+	AsyncTask(ENamedThreads::AnyHiPriThreadNormalTask, [InStopDataUniquePtr = MoveTemp(StopDataUniquePtr), InLineDataUniquePtr = MoveTemp(LineDataUniquePtr), DeleteLineList = MoveTemp(LineDeleteQueue), DeleteStopList = MoveTemp(StopDeleteQueue)]()
 	{
 		{
 			FPackWriteLockGuard WriteLock(FOmniAsync::StopLockData);
 			FOmniAsync::AddTicketCount();
-			TWeakPairArray<AOmniStationBusStop, FStopData>& StopDataList = *StopDataListSharedPtr.Get();
-			for (TTuple<TWeakObjectPtr<AOmniStationBusStop>, FStopData>& StopDataPair : StopDataList)
+			TWeakPairArray<AOmniStationBusStop, FStopData>& StopDataList = *InStopDataUniquePtr.Get();
+			for (TPair<TWeakObjectPtr<AOmniStationBusStop>, FStopData>& StopDataPair : StopDataList)
 			{
 				FOmniAsync::StopLockData.DataMap[StopDataPair.Key] = MoveTemp(StopDataPair.Value);
 			}
-			for (const TWeakObjectPtr<AOmniStationBusStop>& DeleteStopWeak : DeleteStopsList)
+			for (const TWeakObjectPtr<AOmniStationBusStop>& DeleteStopWeak : DeleteStopList)
 			{
 				FOmniAsync::StopLockData.DataMap.erase(DeleteStopWeak);
 			}
@@ -508,8 +500,8 @@ void FOmniAsync::DeliverDataMapAsync()
 		{
 			FPackWriteLockGuard WriteLock(FOmniAsync::LineLockData);
 			FOmniAsync::AddTicketCount();
-			TWeakPairArray<AOmniLineBusRoute, FLineData>& LineDataList = *LineDataListSharedPtr.Get();
-			for (TTuple<TWeakObjectPtr<AOmniLineBusRoute>, FLineData>& LineDataPair : LineDataList)
+			TWeakPairArray<AOmniLineBusRoute, FLineData>& LineDataList = *InLineDataUniquePtr.Get();
+			for (TPair<TWeakObjectPtr<AOmniLineBusRoute>, FLineData>& LineDataPair : LineDataList)
 			{
 				FOmniAsync::LineLockData.DataMap[LineDataPair.Key] = MoveTemp(LineDataPair.Value);
 			}

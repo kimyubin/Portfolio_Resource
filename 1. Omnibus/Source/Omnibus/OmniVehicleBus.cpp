@@ -143,12 +143,14 @@ void AOmniVehicleBus::StartBoarding()
 			return true;
 		}
 		return false;
-	});	
-	
+	});
+
+	// 단위 하차 시간
+	const float UnitExitDelay = 1.0f / CarSpec.ExitSpeed;
 	for (int idx = 0; idx < ExitPassengerList.Num(); ++idx)
 	{
 		// 각각 일정 시간 간격으로 하차 절차 밟음.
-		const float ExitDelay = static_cast<float>(idx + 1) / CarSpec.ExitSpeed;
+		const float ExitDelay = static_cast<float>(idx + 1) * UnitExitDelay;
 		
 		AOmniPassenger* ExitPassenger = ExitPassengerList[idx];
 		ExitPassenger->DoExitToStop(ThisBusStop, ExitDelay);
@@ -161,7 +163,7 @@ void AOmniVehicleBus::StartBoarding()
 	}
 	else
 	{
-		const float EntryTime = static_cast<float>(ExitPassengerList.Num()) / CarSpec.ExitSpeed;
+		const float EntryTime = static_cast<float>(ExitPassengerList.Num()) * UnitExitDelay;
 		FTimerHandle TempTimer;
 		GetWorldTimerManager().SetTimer(TempTimer, [ThisBusStop, this]()
 		{
@@ -185,7 +187,7 @@ void AOmniVehicleBus::EndBoarding()
 
 	// 다음 정류장 정보로 갱신
 	CurrentRouteDistance = GetThisStopDist().Distance;
-	ThisStopIndex        = OwnerBusRoute->GetNextBusStopIdx(ThisStopIndex);
+	ThisStopIndex        = BusRoute->GetNextBusStopIdx(ThisStopIndex);
 }
 
 FTransform AOmniVehicleBus::EntryToBus(AOmniPassenger* InPassenger)

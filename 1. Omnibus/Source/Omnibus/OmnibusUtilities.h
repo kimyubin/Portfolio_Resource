@@ -243,14 +243,13 @@ struct FOmniStatics
 	 * 실제 포인터의 유효성 검사가 아니라, TWeakObjectPtr가 비어있는지만 검사합니다.
 	 * 
 	 * @tparam T 
-	 * @param TestWeak 테스트할 약포인터
-	 * @param NullWeak 미리 생성된 약포인터가 있다면 사용. 아니라면 nullptr을 사용합니다.
+	 * @param InTestWeak 테스트할 약포인터
 	 * @return 비어있다면(nullptr) true 반환
 	 */
 	template <typename T>
-	FORCEINLINE static bool IsNullWeak(const TWeakObjectPtr<T>& TestWeak, const TWeakObjectPtr<T>& NullWeak = nullptr)
+	FORCEINLINE static bool IsNullWeak(const TWeakObjectPtr<T>& InTestWeak)
 	{
-		return IsSameWeak(TestWeak, NullWeak);
+		return InTestWeak.IsExplicitlyNull();
 	};
 
 	/**
@@ -259,13 +258,12 @@ struct FOmniStatics
 	 * 
 	 * @tparam T 
 	 * @param TestWeak 테스트할 약포인터
-	 * @param NullWeak 미리 생성된 약포인터가 있다면 사용. 아니라면 nullptr을 사용합니다.
 	 * @return 비어있지 않다면 true 반환
 	 */
 	template <typename T>
-	FORCEINLINE static bool IsValidSafe(const TWeakObjectPtr<T>& TestWeak, const TWeakObjectPtr<T>& NullWeak = nullptr)
+	FORCEINLINE static bool IsValidSafe(const TWeakObjectPtr<T>& TestWeak)
 	{
-		return IsNullWeak(TestWeak, NullWeak) == false;
+		return IsNullWeak(TestWeak) == false;
 	};
 	
 };
