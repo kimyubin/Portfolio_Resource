@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "OmniObject.h"
 #include "OmnibusTypes.h"
 #include "UObject/NoExportTypes.h"
 #include "OmniTimeManager.generated.h"
@@ -21,18 +22,20 @@ using FOmniRealTimerManager = FTimerManager;
  * 
  */
 UCLASS()
-class OMNIBUS_API UOmniTimeManager : public UObject
+class OMNIBUS_API UOmniTimeManager : public UOmniObject
 {
 	GENERATED_BODY()
 
 public:
 	UOmniTimeManager();
-	void Initialize(UOmnibusGameInstance* InOmniGameInstance);
+
+	virtual void Initialize(UOmnibusGameInstance* InOmniGameInstance) override;
+
 	virtual void BeginDestroy() override;
 	virtual UWorld* GetWorld() const override;
 
-	void LevelInitialize(UOmnibusGameInstance* InOmniGameInstance);
-	void LevelUninitialize(UOmnibusGameInstance* InOmniGameInstance);
+	void PostLevelBeginPlay();
+	void LevelEnd();
 
 	/** FWorldDelegates::OnWorldTickStart 이벤트 콜백 함수. DeltaTime이 확장되기 전에 호출되기 때문에, 실제 현실 시간기반의 DeltaSec가 입력됩니다. */
 	void OnWorldTickStart(UWorld* InWorld, ELevelTick InLevelTick, float InRealDeltaSeconds);
@@ -88,8 +91,6 @@ public:
 	FOnPostGameSpeedChange OnPostGameSpeedChange;
 
 protected:
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
-	TWeakObjectPtr<UOmnibusGameInstance> OmniGameInstance;
 
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	TArray<float> GameSpeedList;
@@ -131,11 +132,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	double LevelStartTimeSecond;
 
+	FDelegateHandle PostLevelBeginPlayHandle;
+	FDelegateHandle LevelEndHandle;
+
 	FDelegateHandle TickStartHandle;
 	FDelegateHandle PrevActorTickHandle;
 	FDelegateHandle PostActorTickHandle;
-	FDelegateHandle LevelInitializeHandle;
-	FDelegateHandle LevelUninitializeHandle;
 
 	//~=============================================================================
 	/** RealTime(현실시간) 기반 타이머를 관리하는 매니저 */

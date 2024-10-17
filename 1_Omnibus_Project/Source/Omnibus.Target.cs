@@ -11,5 +11,11 @@ public class OmnibusTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.Latest;     //V2;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest; //Unreal5_1;
 		ExtraModuleNames.Add("Omnibus");
+		RegisterModulesCreatedByRider();
+	}
+
+	private void RegisterModulesCreatedByRider()
+	{
+		ExtraModuleNames.AddRange(new string[] { "Utilibrary" });
 	}
 }

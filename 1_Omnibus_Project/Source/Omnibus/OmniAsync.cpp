@@ -3,13 +3,15 @@
 
 #include "OmniAsync.h"
 
-#include <queue>
-
 #include "OmnibusGameInstance.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
 #include "OmniPlayMainUI.h"
 #include "OmniStationBusStop.h"
+
+#include "UTLStatics.h"
+
+#include <queue>
 
 
 UOmniPathFinder::UOmniPathFinder()
@@ -17,14 +19,16 @@ UOmniPathFinder::UOmniPathFinder()
 	TaskCount = FMath::Max(FPlatformMisc::NumberOfWorkerThreadsToSpawn() / 2, 2);
 }
 
-void UOmniPathFinder::Initialize()
+void UOmniPathFinder::Initialize(UOmnibusGameInstance* InOmniGameInstance)
 {
+	Super::Initialize(InOmniGameInstance);
+
 	PrevActorTickHandle = FWorldDelegates::OnWorldPreActorTick.AddUObject(this, &UOmniPathFinder::OnWorldPreActorTick);
 	PostActorTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &UOmniPathFinder::OnWorldPostActorTick);
 
-	LevelInitializeHandle   = FOmniWorldDelegates::OnLevelInitialize.AddUObject(this, &UOmniPathFinder::LevelInitialize);
-	LevelUninitializeHandle = FOmniWorldDelegates::OnLevelUninitialize.AddUObject(this, &UOmniPathFinder::LevelUninitialize);
-	
+	PostLevelBeginPlayHandle = FOmniWorldDelegates::OnPostLevelBeginPlay.AddUObject(this, &UOmniPathFinder::PostLevelBeginPlay);
+	LevelEndHandle           = FOmniWorldDelegates::OnLevelEnd.AddUObject(this, &UOmniPathFinder::LevelEnd);
+
 	// 부하를 줄이기 위해 작업스레드 수의 절반만 사용
 	TaskCount = FMath::Max(FPlatformMisc::NumberOfWorkerThreadsToSpawn() / 2, 2);
 }
@@ -34,21 +38,21 @@ void UOmniPathFinder::BeginDestroy()
 	FWorldDelegates::OnWorldPreActorTick.Remove(PrevActorTickHandle);
 	FWorldDelegates::OnWorldPostActorTick.Remove(PostActorTickHandle);
 
-	FOmniWorldDelegates::OnLevelInitialize.Remove(LevelInitializeHandle);
-	FOmniWorldDelegates::OnLevelUninitialize.Remove(LevelUninitializeHandle);
+	FOmniWorldDelegates::OnPostLevelBeginPlay.Remove(PostLevelBeginPlayHandle);
+	FOmniWorldDelegates::OnLevelEnd.Remove(LevelEndHandle);
 
 	UObject::BeginDestroy();
 }
 
-void UOmniPathFinder::LevelInitialize(UOmnibusGameInstance* InOmniGameInstance)
+void UOmniPathFinder::PostLevelBeginPlay()
 {
 }
 
-void UOmniPathFinder::LevelUninitialize(UOmnibusGameInstance* InOmniGameInstance)
+void UOmniPathFinder::LevelEnd()
 {
 	// 레벨이 끝날 때, 비동기 데이터 정리.
 	// todo: 레벨 끝날 때, 각 승객이 취소요청을 하지만, 전체 Abort 처리 혹은 레벨별 태그를 이용해서 자동 중단 처리가 필요할 수 있습니다.
-	FOmniAsync::ClearDataMapAsync();
+	FOmniAsync::ClearProxyDataAsync();
 }
 
 void UOmniPathFinder::OnWorldPreActorTick(UWorld* InWorld, ELevelTick InLevelTick, float InDeltaSeconds)
@@ -58,7 +62,7 @@ void UOmniPathFinder::OnWorldPreActorTick(UWorld* InWorld, ELevelTick InLevelTic
 
 void UOmniPathFinder::OnWorldPostActorTick(UWorld* World, ELevelTick TickType, float DeltaTime)
 {
-	FOmniAsync::DeliverDataMapAsync();
+	FOmniAsync::DeliverProxyDataAsync();
 }
 
 TQueryID UOmniPathFinder::FindTransferPathAsync(const FOmniPathFindingQuery& InPathQuery)
@@ -80,12 +84,12 @@ void UOmniPathFinder::RetryPathFinding(FOmniPathFindingQuery&& InPathQuery)
 
 void UOmniPathFinder::AbortPathFinding(const TQueryID InAbortID)
 {
-	bool bIsRetryQueryRemove = OmniContainer::RemoveByPredicate(RetryPathFindingQueryList, [InAbortID](const FOmniPathFindingQuery& InFindingQuery)
+	bool bIsRetryQueryRemove = UtlContainer::RemoveByPredicate(RetryPathFindingQueryList, [InAbortID](const FOmniPathFindingQuery& InFindingQuery)
 	{
 		return InFindingQuery.QueryID == InAbortID;
 	});
 	
-	bool bIsPathQueryRemove = OmniContainer::RemoveByPredicate(PathFindingQueryList, [InAbortID](const FOmniPathFindingQuery& InFindingQuery)
+	bool bIsPathQueryRemove = UtlContainer::RemoveByPredicate(PathFindingQueryList, [InAbortID](const FOmniPathFindingQuery& InFindingQuery)
 	{
 		return InFindingQuery.QueryID == InAbortID;
 	});
@@ -165,12 +169,12 @@ void UOmniPathFinder::ExecutePathFindingQuery(TWeakObjectPtr<UOmniPathFinder> In
 
 	for (const TWeakObjectPtr<AOmniStationBusStop>& StartStopWeak : StartList)
 	{
-		if (FOmniStatics::IsNullWeak(StartStopWeak))
+		if (FUtlStatics::IsNullWeak(StartStopWeak))
 			continue;
 
 		for (const TWeakObjectPtr<AOmniStationBusStop>& EndStopWeak : EndList)
 		{
-			if (FOmniStatics::IsNullWeak(EndStopWeak))
+			if (FUtlStatics::IsNullWeak(EndStopWeak))
 				continue;
 
 			// 환승 규칙만큼 경로 탐색.
@@ -257,14 +261,14 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 	// 휴리스틱. 목적지 까지의 예상 거리 계산. 유클리드 거리.
 	FVector2D EndStopPos;
 	{
-		FPackReadLockGuard ReadLock(FOmniAsync::StopLockData);
+		TPackReadLockGuard ReadLock(FOmniAsync::StopProxyLockPack);
 		if (TicketCount != FOmniAsync::GetTicketCount())
 			return EFindPath::Interruption_By_Update;
 
-		const weak_map<AOmniStationBusStop, FStopData>& StopDataMap = FOmniAsync::StopLockData.DataMap;
+		const weak_map<AOmniStationBusStop, FStopProxy>& StopProxyMap = FOmniAsync::StopProxyLockPack.DataMap;
 
-		const auto FindIt = StopDataMap.find(InEndBusStop);
-		if (FindIt == StopDataMap.end())
+		const auto FindIt = StopProxyMap.find(InEndBusStop);
+		if (FindIt == StopProxyMap.end())
 			return EFindPath::Fail_Invalid_Stop;
 
 		EndStopPos = FindIt->second.StopLocation;
@@ -272,11 +276,11 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 
 	auto HeuristicToEndStop = [EndStopPos](const TWeakObjectPtr<AOmniStationBusStop>& InNextBusStop) -> double
 	{
-		FPackReadLockGuard ReadLock(FOmniAsync::StopLockData);
-		const weak_map<AOmniStationBusStop, FStopData>& StopDataMap = FOmniAsync::StopLockData.DataMap;
+		TPackReadLockGuard ReadLock(FOmniAsync::StopProxyLockPack);
+		const weak_map<AOmniStationBusStop, FStopProxy>& StopProxyMap = FOmniAsync::StopProxyLockPack.DataMap;
 
-		const auto FindIt = StopDataMap.find(InNextBusStop);
-		if (FindIt == StopDataMap.end())
+		const auto FindIt = StopProxyMap.find(InNextBusStop);
+		if (FindIt == StopProxyMap.end())
 			return FOmniConst::GetBigNumber<double>();
 
 		const FVector2D InStopStartPos = FindIt->second.StopLocation;
@@ -299,14 +303,14 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 			OutPathList.Emplace(CurrentStep);
 			TWeakObjectPtr<AOmniStationBusStop> CurrentBusStop = CurrentStep.BusStop;
 			
-			OB_IF ( FOmniStatics::IsNullWeak(CurrentBusStop) )
+			UT_IF ( FUtlStatics::IsNullWeak(CurrentBusStop) )
 				return;
 
 			CurrentStep = InCameFromHow.at(CurrentBusStop);
 
 			if (OutPathList.Num() > 1'000'000)
 			{
-				OB_LOG("Loop Max Over")
+				UT_LOG("Loop Max Over")
 				OutPathList.Empty();
 				return;
 			}
@@ -341,7 +345,7 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 		const TWeakObjectPtr<AOmniStationBusStop> CurrentBusStop = PriorityQ.top().second;
 		PriorityQ.pop();
 
-		if (FOmniStatics::IsSameWeak(CurrentBusStop, InEndBusStop))
+		if (FUtlStatics::IsSameWeak(CurrentBusStop, InEndBusStop))
 		{
 			ReconstructPath(CameFromHow, CurrentBusStop, OutTransferPath);
 			return EFindPath::Success;
@@ -351,15 +355,15 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 
 		// 정류장 Lock Guard
 		{
-			FPackReadLockGuard ReadLock(FOmniAsync::StopLockData);
+			TPackReadLockGuard ReadLock(FOmniAsync::StopProxyLockPack);
 
 			if (TicketCount != FOmniAsync::GetTicketCount())
 				return EFindPath::Interruption_By_Update;
 
-			const weak_map<AOmniStationBusStop, FStopData>& StopDataMap = FOmniAsync::StopLockData.DataMap;
+			const weak_map<AOmniStationBusStop, FStopProxy>& StopProxyMap = FOmniAsync::StopProxyLockPack.DataMap;
 
-			const auto FindIt = StopDataMap.find(CurrentBusStop);
-			OB_IF(FindIt == StopDataMap.end())
+			const auto FindIt = StopProxyMap.find(CurrentBusStop);
+			UT_IF(FindIt == StopProxyMap.end())
 				continue;
 
 			BusRoutes = FindIt->second.BusRoutes;
@@ -374,30 +378,30 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 
 			// 노선 Lock Guard
 			{
-				FPackReadLockGuard ReadLock(FOmniAsync::LineLockData);
+				TPackReadLockGuard ReadLock(FOmniAsync::LineProxyLockPack);
 
 				if (TicketCount != FOmniAsync::GetTicketCount())
 					return EFindPath::Interruption_By_Update;
 
-				const weak_map<AOmniLineBusRoute, FLineData>& LineDataMap = FOmniAsync::LineLockData.DataMap;
+				const weak_map<AOmniLineBusRoute, FLineProxy>& LineProxyMap = FOmniAsync::LineProxyLockPack.DataMap;
 
-				const auto FindIt = LineDataMap.find(BusLineWeak);
-				OB_IF(FindIt == LineDataMap.end())
+				const auto FindIt = LineProxyMap.find(BusLineWeak);
+				UT_IF(FindIt == LineProxyMap.end())
 				{
 					continue;
 				}
 
-				const FLineData& LineData = FindIt->second;
+				const FLineProxy& LineProxy = FindIt->second;
 
-				BusStopDistanceList = LineData.BusStopDistanceList;
-				LineSplineLength    = LineData.LineSplineLength;
+				BusStopDistanceList = LineProxy.BusStopDistanceList;
+				LineSplineLength    = LineProxy.LineSplineLength;
 			}
 
 			for (int NextDistIdx = 0; NextDistIdx < BusStopDistanceList.Num(); ++NextDistIdx)
 			{
 				const FBusStopDistance& NextBusStopDist         = BusStopDistanceList[NextDistIdx];
 				TWeakObjectPtr<AOmniStationBusStop> NextBusStop = NextBusStopDist.BusStop;
-				if (FOmniStatics::IsNullWeak(NextBusStop) || FOmniStatics::IsSameWeak(CurrentBusStop, NextBusStop))
+				if (FUtlStatics::IsNullWeak(NextBusStop) || FUtlStatics::IsSameWeak(CurrentBusStop, NextBusStop))
 					continue;
 
 				// 다음 정류장까지 가는 경로 및 거리
@@ -408,7 +412,7 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 
 				// 내릴 땐 환승저항 추가 안함.
 				float TransferResist = InTransferRules.GetResistance();
-				if (FOmniStatics::IsSameWeak(NextBusStop, InEndBusStop))
+				if (FUtlStatics::IsSameWeak(NextBusStop, InEndBusStop))
 					TransferResist = 0.0f;
 
 				const double tentativeNextGDist = G_DistFromStart[CurrentBusStop] + DistToNextStop + TransferResist; // 다음 버스정류장 가는 거리. 환승 저항 추가.
@@ -431,8 +435,8 @@ EFindPath UOmniPathFinder::FindPathByStop(const TWeakObjectPtr<AOmniStationBusSt
 	return EFindPath::Fail_No_Path;
 }
 
-FLockPackage<AOmniStationBusStop, FStopData> FOmniAsync::StopLockData{};
-FLockPackage<AOmniLineBusRoute, FLineData> FOmniAsync::LineLockData{};
+TLockPackage<AOmniStationBusStop, FStopProxy> FOmniAsync::StopProxyLockPack{};
+TLockPackage<AOmniLineBusRoute, FLineProxy> FOmniAsync::LineProxyLockPack{};
 
 std::atomic<uint64> FOmniAsync::TicketCount{0};
 
@@ -458,56 +462,64 @@ FOmniAsync::FOnPostDataUpdate FOmniAsync::OnPostDataUpdate;
 template <class InKeyType, class InValueType>
 using TWeakPairArray = TArray<TPair<TWeakObjectPtr<InKeyType>, InValueType>>;
 
-void FOmniAsync::DeliverDataMapAsync()
+void FOmniAsync::DeliverProxyDataAsync()
 {
 	if (StopUpdateQueue.IsEmpty() && LineUpdateQueue.IsEmpty() && StopDeleteQueue.IsEmpty() && LineDeleteQueue.IsEmpty())
 		return;
 
 	// 복사를 줄이기 위해 TUniquePtr 사용.
-	TUniquePtr<TWeakPairArray<AOmniStationBusStop, FStopData>> StopDataUniquePtr = MakeUnique<TWeakPairArray<AOmniStationBusStop, FStopData>>();
-	TUniquePtr<TWeakPairArray<AOmniLineBusRoute, FLineData>> LineDataUniquePtr   = MakeUnique<TWeakPairArray<AOmniLineBusRoute, FLineData>>();
+	TUniquePtr<TWeakPairArray<AOmniStationBusStop, FStopProxy>> StopProxyListUnique = MakeUnique<TWeakPairArray<AOmniStationBusStop, FStopProxy>>();
+	TUniquePtr<TWeakPairArray<AOmniLineBusRoute, FLineProxy>> LineProxyListUnique   = MakeUnique<TWeakPairArray<AOmniLineBusRoute, FLineProxy>>();
 
 	// 업데이트 목록으로 데이터 생성
 	for (TWeakObjectPtr<AOmniStationBusStop>& UpdateStopWeak : StopUpdateQueue)
 	{
 		if (const AOmniStationBusStop* UpdateStop = UpdateStopWeak.Get())
-			StopDataUniquePtr.Get()->Emplace(UpdateStopWeak, FStopData{UpdateStop->GetBusRouteList(), FVector2D(UpdateStop->GetActorLocation())});
+		{
+			StopProxyListUnique.Get()->Emplace(UpdateStopWeak, FStopProxy{UpdateStop->GetBusRouteList(), FVector2D(UpdateStop->GetActorLocation())});
+		}
 	}
 	for (TWeakObjectPtr<AOmniLineBusRoute>& UpdateLineWeak : LineUpdateQueue)
 	{
 		if (const AOmniLineBusRoute* UpdateLine = UpdateLineWeak.Get())
-			LineDataUniquePtr.Get()->Emplace(UpdateLineWeak, FLineData{UpdateLine->GetBusStopDistanceList(), UpdateLine->GetRouteLength()});
+		{
+			LineProxyListUnique.Get()->Emplace(UpdateLineWeak, FLineProxy{UpdateLine->GetBusStopDistanceList(), UpdateLine->GetRouteLength()});
+		}
 	}
 
 	// Wait하지 않기 위해, 다른 스레드에서 데이터 업데이트. 즉시 업데이트를 위해 비교적 높은 우선순위 쓰레드 사용.
 	// 삭제 데이터는 목록만 필요하기 때문에 이동처리.
-	AsyncTask(ENamedThreads::AnyHiPriThreadNormalTask, [InStopDataUniquePtr = MoveTemp(StopDataUniquePtr), InLineDataUniquePtr = MoveTemp(LineDataUniquePtr), DeleteLineList = MoveTemp(LineDeleteQueue), DeleteStopList = MoveTemp(StopDeleteQueue)]()
+	AsyncTask(ENamedThreads::AnyHiPriThreadNormalTask, [InStopProxyListUnique = MoveTemp(StopProxyListUnique), InLineProxyListUnique = MoveTemp(LineProxyListUnique), DeleteLineList = MoveTemp(LineDeleteQueue), DeleteStopList = MoveTemp(StopDeleteQueue)]()
 	{
 		{
-			FPackWriteLockGuard WriteLock(FOmniAsync::StopLockData);
+			FPackWriteLockGuard WriteLock(FOmniAsync::StopProxyLockPack);
 			FOmniAsync::AddTicketCount();
-			TWeakPairArray<AOmniStationBusStop, FStopData>& StopDataList = *InStopDataUniquePtr.Get();
-			for (TPair<TWeakObjectPtr<AOmniStationBusStop>, FStopData>& StopDataPair : StopDataList)
+
+			TWeakPairArray<AOmniStationBusStop, FStopProxy>& StopProxyList = *InStopProxyListUnique.Get();
+			for (TPair<TWeakObjectPtr<AOmniStationBusStop>, FStopProxy>& StopProxyPair : StopProxyList)
 			{
-				FOmniAsync::StopLockData.DataMap[StopDataPair.Key] = MoveTemp(StopDataPair.Value);
+				FOmniAsync::StopProxyLockPack.DataMap[StopProxyPair.Key] = MoveTemp(StopProxyPair.Value);
 			}
+
 			for (const TWeakObjectPtr<AOmniStationBusStop>& DeleteStopWeak : DeleteStopList)
 			{
-				FOmniAsync::StopLockData.DataMap.erase(DeleteStopWeak);
+				FOmniAsync::StopProxyLockPack.DataMap.erase(DeleteStopWeak);
 			}
 		}
 
 		{
-			FPackWriteLockGuard WriteLock(FOmniAsync::LineLockData);
+			FPackWriteLockGuard WriteLock(FOmniAsync::LineProxyLockPack);
 			FOmniAsync::AddTicketCount();
-			TWeakPairArray<AOmniLineBusRoute, FLineData>& LineDataList = *InLineDataUniquePtr.Get();
-			for (TPair<TWeakObjectPtr<AOmniLineBusRoute>, FLineData>& LineDataPair : LineDataList)
+
+			TWeakPairArray<AOmniLineBusRoute, FLineProxy>& LineProxyList = *InLineProxyListUnique.Get();
+			for (TPair<TWeakObjectPtr<AOmniLineBusRoute>, FLineProxy>& LineProxyPair : LineProxyList)
 			{
-				FOmniAsync::LineLockData.DataMap[LineDataPair.Key] = MoveTemp(LineDataPair.Value);
+				FOmniAsync::LineProxyLockPack.DataMap[LineProxyPair.Key] = MoveTemp(LineProxyPair.Value);
 			}
+
 			for (const TWeakObjectPtr<AOmniLineBusRoute>& DeleteLineWeak : DeleteLineList)
 			{
-				FOmniAsync::LineLockData.DataMap.erase(DeleteLineWeak);
+				FOmniAsync::LineProxyLockPack.DataMap.erase(DeleteLineWeak);
 			}
 		}
 
@@ -526,27 +538,27 @@ void FOmniAsync::DeliverDataMapAsync()
 	LineDeleteQueue.Reset();
 }
 
-void FOmniAsync::ClearDataMapAsync()
+void FOmniAsync::ClearProxyDataAsync()
 {
 	AsyncTask(ENamedThreads::AnyHiPriThreadNormalTask, []() mutable
 	{
 		{
-			FPackWriteLockGuard WriteLock(FOmniAsync::StopLockData);
+			FPackWriteLockGuard WriteLock(FOmniAsync::StopProxyLockPack);
 			FOmniAsync::AddTicketCount();
-			weak_map<AOmniStationBusStop, FStopData> EmptyStopMap{};
-			std::swap(FOmniAsync::StopLockData.DataMap, EmptyStopMap);
+			weak_map<AOmniStationBusStop, FStopProxy> EmptyStopMap{};
+			std::swap(FOmniAsync::StopProxyLockPack.DataMap, EmptyStopMap);
 		}
 		{
-			FPackWriteLockGuard WriteLock(FOmniAsync::LineLockData);
+			FPackWriteLockGuard WriteLock(FOmniAsync::LineProxyLockPack);
 			FOmniAsync::AddTicketCount();
-			weak_map<AOmniLineBusRoute, FLineData> EmptyLineMap{};
-			std::swap(FOmniAsync::LineLockData.DataMap, EmptyLineMap);
-			// FOmniAsync::LineLockData.DataMap.clear();    // 버킷 사이즈 유지
+			weak_map<AOmniLineBusRoute, FLineProxy> EmptyLineMap{};
+			std::swap(FOmniAsync::LineProxyLockPack.DataMap, EmptyLineMap);
+			// FOmniAsync::LineProxyLockPack.DataMap.clear();    // 버킷 사이즈 유지
 		}
 	});
 }
 
-void FOmniAsync::UpdateStopDataAsync(AOmniStationBusStop* InTargetStop)
+void FOmniAsync::UpdateStopProxyAsync(AOmniStationBusStop* InTargetStop)
 {
 	if (IsValid(InTargetStop) == false)
 		return;
@@ -557,7 +569,7 @@ void FOmniAsync::UpdateStopDataAsync(AOmniStationBusStop* InTargetStop)
 	StopUpdateQueue.Emplace(InTargetStop);
 }
 
-void FOmniAsync::UpdateLineDataAsync(AOmniLineBusRoute* InTargetLine)
+void FOmniAsync::UpdateLineProxyAsync(AOmniLineBusRoute* InTargetLine)
 {
 	if (IsValid(InTargetLine) == false)
 		return;
@@ -568,7 +580,7 @@ void FOmniAsync::UpdateLineDataAsync(AOmniLineBusRoute* InTargetLine)
 	LineUpdateQueue.Emplace(InTargetLine);
 }
 
-void FOmniAsync::DeleteStopDataAsync(AOmniStationBusStop* InTargetStop)
+void FOmniAsync::DeleteStopProxyAsync(AOmniStationBusStop* InTargetStop)
 {
 	if (IsValid(InTargetStop) == false)
 		return;
@@ -579,7 +591,7 @@ void FOmniAsync::DeleteStopDataAsync(AOmniStationBusStop* InTargetStop)
 	StopDeleteQueue.Emplace(InTargetStop);
 }
 
-void FOmniAsync::DeleteLineDataAsync(AOmniLineBusRoute* InTargetLine)
+void FOmniAsync::DeleteLineProxyAsync(AOmniLineBusRoute* InTargetLine)
 {
 	if (IsValid(InTargetLine) == false)
 		return;

@@ -3,19 +3,21 @@
 
 #include "OmniPassenger.h"
 
-#include <queue>
-
 #include "OmniAsync.h"
 #include "OmnibusGameInstance.h"
 #include "OmnibusPlayData.h"
 #include "OmnibusRoadManager.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniPlayMainUI.h"
 #include "OmniStationBusStop.h"
 #include "OmniTimeManager.h"
 #include "OmniVehicleBus.h"
 #include "PathVisualizator.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
+
+#include <queue>
 
 AOmniPassenger::AOmniPassenger()
 {
@@ -43,7 +45,7 @@ AOmniPassenger::AOmniPassenger()
 	StepListIdx = INDEX_NONE;
 
 	CurrentJourneyDirection = EJourneyDirection::HomeToDest;
-	CurrentLocationInfo    = FPassengerLocationInfo();
+	CurrentLocationInfo     = FPassengerLocationInfo();
 
 	MyLastRouteMapVersion = 0;
 }
@@ -56,7 +58,7 @@ void AOmniPassenger::BeginPlay()
 	InputMeshComponent->OnEndCursorOver.AddDynamic(this, &AOmniPassenger::EndCursorOver);
 
 	MyTransferRuleList = GetOmnibusPlayData()->GetTransferRuleList();
-	OB_LIGHT_CHECK(MyTransferRuleList.IsEmpty() == false, "TransferRuleList is empty. Check PlayData")
+	UT_LIGHT_CHECK(MyTransferRuleList.IsEmpty() == false, "TransferRuleList is empty. Check PlayData")
 
 	SetJourneyState(EJourneyState::None);
 }
@@ -67,13 +69,13 @@ void AOmniPassenger::PostBeginPlay()
 	// 레벨에 미리 스폰되어져 있는 경우 필요한 로직.
 
 	AOmnibusRoadManager* RoadManager = GetOmnibusRoadManager();
-	OB_IF(RoadManager == nullptr)
+	UT_IF(RoadManager == nullptr)
 		return;
 
 	RoadManager->AddPassenger(this);
 
 	// 레벨에 미리 깔려있는 경우, 등록 후 자동 시작.
-	FOmniTime::SimpleTimer(this, 2.0, [ThisWeak = TWeakObjectPtr<AOmniPassenger>(this)]()
+	FUtlTime::SimpleTimer(this, 2.0, [ThisWeak = TWeakObjectPtr<AOmniPassenger>(this)]()
 	{
 		AOmniPassenger* Passenger = ThisWeak.Get();
 		if (Passenger == nullptr)
@@ -198,7 +200,7 @@ void AOmniPassenger::RetryJourney()
 			FindPathAndStartJourney();
 			break;
 		case FPassengerLocationInfo::EState::BusStop:
-			FindPathAndStartJourneyStopToSector(CurrentLocationInfo.BusStop.Get(), GetTargetSectorInfo());
+			FindPathAndStartJourneyStopToSector(CurrentLocationInfo.GetBusStop(), GetTargetSectorInfo());
 			break;
 		// case FPassengerLocationInfo::EState::Bus: break;
 		// case FPassengerLocationInfo::EState::Sidewalk: break;
@@ -356,7 +358,7 @@ int32 AOmniPassenger::GetPathIdxByThisBus(const AOmniVehicleBus* InThisBus)
 	{
 		const FTransferStep* MyStep = GetTransferStep(PathIdx, StepListIdx);
 
-		OB_IF(MyStep == nullptr)
+		UT_IF(MyStep == nullptr)
 			continue;
 
 		if (InThisBus->HasSameTransStep(*MyStep))
@@ -387,7 +389,7 @@ void AOmniPassenger::DoEntryToBus(AOmniVehicleBus* InThisBus, const float InEntr
 	if (TransferPathList.Num() > 1)
 	{
 		const int32 PathIdx = GetPathIdxByThisBus(InThisBus);
-		OB_IF (PathIdx == INDEX_NONE || TransferPathList.IsValidIndex(PathIdx) == false)
+		UT_IF (PathIdx == INDEX_NONE || TransferPathList.IsValidIndex(PathIdx) == false)
 		{
 			return;
 		}
@@ -402,9 +404,9 @@ void AOmniPassenger::DoEntryToBus(AOmniVehicleBus* InThisBus, const float InEntr
 	const FTransform BusTransform = InThisBus->EntryToBus(this);
 
 	FTimerHandle EntryToBusHandle;
-	GetWorldTimerManager().SetTimer(EntryToBusHandle, [PassengerWeak = TWeakObjectPtr<AOmniPassenger>(this), InThisBus, BusTransform]()
+	GetWorldTimerManager().SetTimer(EntryToBusHandle, [ThisPassengerWeak = TWeakObjectPtr<AOmniPassenger>(this), InThisBus, BusTransform]()
 	{
-		if (AOmniPassenger* Passenger = PassengerWeak.Get())
+		if (AOmniPassenger* Passenger = ThisPassengerWeak.Get())
 		{
 			Passenger->AttachToActor(InThisBus, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 			Passenger->SetTransformAndOffsetNoScale(BusTransform);
@@ -415,9 +417,9 @@ void AOmniPassenger::DoEntryToBus(AOmniVehicleBus* InThisBus, const float InEntr
 void AOmniPassenger::DoExitToStop(AOmniStationBusStop* InThisBusStop, const float InExitDelay)
 {
 	FTimerHandle ExitToStopHandle;
-	GetWorldTimerManager().SetTimer(ExitToStopHandle, [PassengerWeak = TWeakObjectPtr<AOmniPassenger>(this), InThisBusStop]()
+	GetWorldTimerManager().SetTimer(ExitToStopHandle, [ThisPassengerWeak = TWeakObjectPtr<AOmniPassenger>(this), InThisBusStop]()
 	{
-		if (AOmniPassenger* Passenger = PassengerWeak.Get())
+		if (AOmniPassenger* Passenger = ThisPassengerWeak.Get())
 		{
 			Passenger->DoExitToStopImpl(InThisBusStop);
 		}
@@ -426,7 +428,7 @@ void AOmniPassenger::DoExitToStop(AOmniStationBusStop* InThisBusStop, const floa
 
 void AOmniPassenger::DoExitToStopImpl(AOmniStationBusStop* InThisBusStop)
 {
-	OB_IF(IsExitToThisBusStop(InThisBusStop) == false)
+	UT_IF(IsExitToThisBusStop(InThisBusStop) == false)
 	{
 		return;
 	}

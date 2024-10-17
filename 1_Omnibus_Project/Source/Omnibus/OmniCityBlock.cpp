@@ -3,16 +3,16 @@
 
 #include "OmniCityBlock.h"
 
-#include "Omnibus.h"
 #include "OmnibusRoadManager.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniCityBlockWidget.h"
 #include "OmniRoad.h"
 #include "OmniStationBusStop.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "Components/WidgetComponent.h"
+
+#include "UTLStatics.h"
 
 AOmniCityBlock::AOmniCityBlock()
 {
@@ -63,7 +63,7 @@ void AOmniCityBlock::BeginPlay()
 {
 	Super::BeginPlay();
 
-	CurrentType = static_cast<ECityBlockType>(OmniMath::GetIntRandom(static_cast<int>(ECityBlockType::None), static_cast<int>(ECityBlockType::Size) - 1));
+	CurrentType = static_cast<ECityBlockType>(UtlMath::GetIntRandom(static_cast<int>(ECityBlockType::None), static_cast<int>(ECityBlockType::Size) - 1));
 		                                                              
 	UOmniCityBlockWidget* TypeSignWidget = Cast<UOmniCityBlockWidget>(TypeSignWidgetComponent->GetUserWidgetObject());
 	if (TypeSignWidget)
@@ -99,7 +99,7 @@ void AOmniCityBlock::PostBeginPlay()
 
 void AOmniCityBlock::MakeCollisionAlongSpline()
 {
-	if (OB_IS_VALID(OutLineMesh) == false)
+	if (UT_IS_VALID(OutLineMesh) == false)
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
@@ -110,7 +110,7 @@ void AOmniCityBlock::MakeCollisionAlongSpline()
 	const int32 SplinePointsSize = BlockOutLine->GetNumberOfSplinePoints();
 	for (int PointIdx = 0; PointIdx < SplinePointsSize; ++PointIdx)
 	{
-		// OmniMath::CircularNum(SplinePointsSize - 1, PointIdx);
+		// UtlMath::CircularNum(SplinePointsSize - 1, PointIdx);
 		// 마지막 포인트와 처음 포인트 연결.
 		const int NextIdx    = PointIdx + 1 < SplinePointsSize ? PointIdx + 1 : 0;
 		const FVector StartLoc     = BlockOutLine->GetLocationAtSplinePoint(PointIdx, CoordSpace);
@@ -120,7 +120,7 @@ void AOmniCityBlock::MakeCollisionAlongSpline()
 		
 		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), false, FTransform(), false));
 
-		if (OB_IS_VALID(NewSplineMesh) == false)
+		if (UT_IS_VALID(NewSplineMesh) == false)
 			continue;
 
 		NewSplineMesh->SetStaticMesh(OutLineMesh);
@@ -150,7 +150,7 @@ void AOmniCityBlock::SearchBusStop()
 	for (TWeakObjectPtr<USplineMeshComponent>& GenMesh : GeneratedMeshes)
 	{
 		TArray<AActor*> PartOverLapping;
-		FOmniStatics::GetOverlapActors(GenMesh.Get(), BusStopClass, PartOverLapping);
+		FUtlStatics::GetOverlapActors(GenMesh.Get(), BusStopClass, PartOverLapping);
 
 		AllOverlappingActors.Append(PartOverLapping);
 	}
@@ -225,7 +225,7 @@ bool AOmniCityBlock::HasBusStop(AOmniStationBusStop* InBusStop) const
 
 void AOmniCityBlock::AddBusStop(AOmniStationBusStop* InBusStop)
 {
-	if (OB_IS_VALID(InBusStop))
+	if (UT_IS_VALID(InBusStop))
 	{
 		if (HasBusStop(InBusStop) == false)
 			OwnedBusStops.Emplace(InBusStop);

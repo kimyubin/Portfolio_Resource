@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "OmniObject.h"
 #include "OmnibusTypes.h"
 #include "UObject/NoExportTypes.h"
 #include "OmnibusPlayData.generated.h"
@@ -14,14 +15,14 @@ class AOmniVehicleBus;
  * 
  */
 UCLASS(Blueprintable, BlueprintType)
-class OMNIBUS_API UOmnibusPlayData : public UObject
+class OMNIBUS_API UOmnibusPlayData : public UOmniObject
 {
 	GENERATED_BODY()
 
 public:
 	UOmnibusPlayData();
 
-	void Initialize();
+	virtual void Initialize(UOmnibusGameInstance* InOmniGameInstance) override;
 
 	EOmniPlayMode GetPlayMode() const { return PlayMode; }
 	void          SetPlayMode(const EOmniPlayMode InPlayMode) { PlayMode = InPlayMode; }

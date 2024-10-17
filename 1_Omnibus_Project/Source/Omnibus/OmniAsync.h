@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "OmniAsyncTypes.h"
 #include "OmniMacros.h"
+#include "OmniObject.h"
 #include "UObject/NoExportTypes.h"
 #include "OmniAsync.generated.h"
 
@@ -14,18 +15,18 @@
  * Non-GameThread 데이터맵 갱신, 길찾기 요청 쿼리 수집, 실행, 결과 반환 등 관련된 기능을 수행합니다. 
  */
 UCLASS()
-class OMNIBUS_API UOmniPathFinder : public UObject
+class OMNIBUS_API UOmniPathFinder : public UOmniObject
 {
 	GENERATED_BODY()
 
 public:
 	UOmniPathFinder();
 
-	void Initialize();
+	virtual void Initialize(UOmnibusGameInstance* InOmniGameInstance) override;
 	virtual void BeginDestroy() override;
 
-	void LevelInitialize(UOmnibusGameInstance* InOmniGameInstance);
-	void LevelUninitialize(UOmnibusGameInstance* InOmniGameInstance);
+	void PostLevelBeginPlay();
+	void LevelEnd();
 
 	/** FWorldDelegates::OnWorldPreActorTick 이벤트 핸들러. 월드의 모든 액터보다 먼저 실행됩니다. */
 	void OnWorldPreActorTick(UWorld* InWorld, ELevelTick InLevelTick, float InDeltaSeconds);
@@ -102,9 +103,8 @@ protected:
 
 	FDelegateHandle PrevActorTickHandle;
 	FDelegateHandle PostActorTickHandle;
-	FDelegateHandle LevelInitializeHandle;
-	FDelegateHandle LevelUninitializeHandle;
-
+	FDelegateHandle PostLevelBeginPlayHandle;
+	FDelegateHandle LevelEndHandle;
 };
 
 
@@ -117,16 +117,16 @@ protected:
 struct FOmniAsync
 {
 	//~=============================================================================
-	// Non-GameThread Data
+	// Non-GameThread Proxy Data
 	/**
 	 * Non-GameThread에서 사용하는 정류장/노선 데이터 map과 그 뮤텍스입니다.
 	 * key: weakptr, value: 정류장/노선 데이터 복사본
 	 */
-	static FLockPackage<AOmniStationBusStop, FStopData> StopLockData;
-	static FLockPackage<AOmniLineBusRoute, FLineData> LineLockData;
+	static TLockPackage<AOmniStationBusStop, FStopProxy> StopProxyLockPack;
+	static TLockPackage<AOmniLineBusRoute, FLineProxy> LineProxyLockPack;
 
 	/**
-	 * Non-GameThread Data 데이터 변경 확인용
+	 * Non-GameThread Proxy 데이터 변경 확인용
 	 * 데이터가 변경되면 값이 변경됩니다.
 	 * ReadLock에서 wait이 종료될 때 확인해야합니다.
 	 */
@@ -157,10 +157,10 @@ struct FOmniAsync
 	// 함수
 
 	/** 비동기 길찾기에 사용되는 갱신된 데이터 복사본을 Non-GameThreads에 전달합니다. */
-	static void DeliverDataMapAsync();
+	static void DeliverProxyDataAsync();
 
 	/** 비동기 길찾기 데이터를 지웁니다. */
-	static void ClearDataMapAsync();
+	static void ClearProxyDataAsync();
 	
 	/**
 	 * 비동기 길찾기에 사용할 정류장/노선의 데이터를 비동기로 업데이트합니다.
@@ -172,10 +172,10 @@ struct FOmniAsync
 	 * 같은 틱에서 삭제와 동시에 업데이트하는 객체는 없습니다.
 	 * 더 나중에 들어온 데이터만 갱신됩니다.
 	 */
-	static void UpdateStopDataAsync(AOmniStationBusStop* InTargetStop);
-	static void UpdateLineDataAsync(AOmniLineBusRoute* InTargetLine);
+	static void UpdateStopProxyAsync(AOmniStationBusStop* InTargetStop);
+	static void UpdateLineProxyAsync(AOmniLineBusRoute* InTargetLine);
 
-	static void DeleteStopDataAsync(AOmniStationBusStop* InTargetStop);
-	static void DeleteLineDataAsync(AOmniLineBusRoute* InTargetLine);
+	static void DeleteStopProxyAsync(AOmniStationBusStop* InTargetStop);
+	static void DeleteLineProxyAsync(AOmniLineBusRoute* InTargetLine);
 
 };

@@ -141,11 +141,12 @@ protected:
 	void CreateSplineMeshComponents();
 
 public:
-	USplineComponent*        GetRouteSpline() const { return RouteSpline; }
+	USplineComponent*        GetRouteSpline() const;
 	float                    GetRouteLength() const;
 	TArray<FBusStopDistance> GetBusStopDistanceList() const;
 	FBusStopDistance         GetBusStopDist(int32 InIdx) const;
-
+	FLinearColor             GetLineColor() const;
+	
 	/** BusStopDistanceList에서 @InBusStop이 있는 모든 요소의 인덱스를 찾아 반환합니다. */
 	TArray<int32> FindBusStopIdxList(AOmniStationBusStop* InBusStop) const;
 

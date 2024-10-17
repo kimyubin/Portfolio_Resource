@@ -9,28 +9,28 @@ TQueryID FOmniPathFindingQuery::LastPathQueryUniqueID = INVALID_QUERY_ID;
 
 
 //~=============================================================================
-// FLineData
-FLineData::FLineData()
+// FLineProxy
+FLineProxy::FLineProxy()
 	: BusStopDistanceList()
 	, LineSplineLength(0.0f) {}
 
-FLineData::FLineData(const TArray<FBusStopDistance>& InBusStopDistanceList, const float InLineSplineLength)
+FLineProxy::FLineProxy(const TArray<FBusStopDistance>& InBusStopDistanceList, const float InLineSplineLength)
 	: BusStopDistanceList(InBusStopDistanceList)
 	, LineSplineLength(InLineSplineLength) {}
 
-FLineData::FLineData(TArray<FBusStopDistance>&& InBusStopDistanceList, const float InLineSplineLength)
+FLineProxy::FLineProxy(TArray<FBusStopDistance>&& InBusStopDistanceList, const float InLineSplineLength)
 	: BusStopDistanceList(MoveTemp(InBusStopDistanceList))
 	, LineSplineLength(InLineSplineLength) {}
 
-FLineData::FLineData(const FLineData& Other)
+FLineProxy::FLineProxy(const FLineProxy& Other)
 	: BusStopDistanceList(Other.BusStopDistanceList)
 	, LineSplineLength(Other.LineSplineLength) {}
 
-FLineData::FLineData(FLineData&& Other) noexcept
+FLineProxy::FLineProxy(FLineProxy&& Other) noexcept
 	: BusStopDistanceList(MoveTemp(Other.BusStopDistanceList))
 	, LineSplineLength(Other.LineSplineLength) {}
 
-FLineData& FLineData::operator=(const FLineData& Other)
+FLineProxy& FLineProxy::operator=(const FLineProxy& Other)
 {
 	if (this == &Other)
 		return *this;
@@ -40,7 +40,7 @@ FLineData& FLineData::operator=(const FLineData& Other)
 	return *this;
 }
 
-FLineData& FLineData::operator=(FLineData&& Other) noexcept
+FLineProxy& FLineProxy::operator=(FLineProxy&& Other) noexcept
 {
 	if (this == &Other)
 		return *this;
@@ -52,28 +52,28 @@ FLineData& FLineData::operator=(FLineData&& Other) noexcept
 
 
 //~=============================================================================
-// FStopData
-FStopData::FStopData()
+// FStopProxy
+FStopProxy::FStopProxy()
 	: BusRoutes()
 	, StopLocation(FVector2d::ZeroVector) {}
 
-FStopData::FStopData(const TArray<TWeakObjectPtr<AOmniLineBusRoute>>& InBusRoutes, const FVector2D& InStopLocation)
+FStopProxy::FStopProxy(const TArray<TWeakObjectPtr<AOmniLineBusRoute>>& InBusRoutes, const FVector2D& InStopLocation)
 	: BusRoutes(InBusRoutes)
 	, StopLocation(InStopLocation) {}
 
-FStopData::FStopData(TArray<TWeakObjectPtr<AOmniLineBusRoute>>&& InBusRoutes, FVector2D&& InStopLocation)
+FStopProxy::FStopProxy(TArray<TWeakObjectPtr<AOmniLineBusRoute>>&& InBusRoutes, FVector2D&& InStopLocation)
 	: BusRoutes(MoveTemp(InBusRoutes))
 	, StopLocation(MoveTemp(InStopLocation)) {}
 
-FStopData::FStopData(const FStopData& Other)
+FStopProxy::FStopProxy(const FStopProxy& Other)
 	: BusRoutes(Other.BusRoutes)
 	, StopLocation(Other.StopLocation) {}
 
-FStopData::FStopData(FStopData&& Other) noexcept
+FStopProxy::FStopProxy(FStopProxy&& Other) noexcept
 	: BusRoutes(MoveTemp(Other.BusRoutes))
 	, StopLocation(MoveTemp(Other.StopLocation)) {}
 
-FStopData& FStopData::operator=(const FStopData& Other)
+FStopProxy& FStopProxy::operator=(const FStopProxy& Other)
 {
 	if (this == &Other)
 		return *this;
@@ -83,7 +83,7 @@ FStopData& FStopData::operator=(const FStopData& Other)
 	return *this;
 }
 
-FStopData& FStopData::operator=(FStopData&& Other) noexcept
+FStopProxy& FStopProxy::operator=(FStopProxy&& Other) noexcept
 {
 	if (this == &Other)
 		return *this;

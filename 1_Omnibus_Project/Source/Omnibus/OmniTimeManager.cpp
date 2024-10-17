@@ -4,7 +4,9 @@
 #include "OmniTimeManager.h"
 
 #include "OmnibusGameInstance.h"
-#include "OmnibusUtilities.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 
 UOmniTimeManager::UOmniTimeManager()
@@ -26,39 +28,43 @@ UOmniTimeManager::UOmniTimeManager()
 
 void UOmniTimeManager::Initialize(UOmnibusGameInstance* InOmniGameInstance)
 {
-	OmniGameInstance = InOmniGameInstance;
+	Super::Initialize(InOmniGameInstance);
+
 	RealTimerManager = MakeUnique<FOmniRealTimerManager>(InOmniGameInstance);
 
+	// 레벨 틱 초반에 작동
 	TickStartHandle     = FWorldDelegates::OnWorldTickStart.AddUObject(this, &UOmniTimeManager::OnWorldTickStart);
 	PrevActorTickHandle = FWorldDelegates::OnWorldPreActorTick.AddUObject(this, &UOmniTimeManager::OnWorldPreActorTick);
 	// PostActorTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &UOmniTimeManager::OnWorldPostActorTick);
 
-	LevelInitializeHandle   = FOmniWorldDelegates::OnLevelInitialize.AddUObject(this, &UOmniTimeManager::LevelInitialize);
-	LevelUninitializeHandle = FOmniWorldDelegates::OnLevelUninitialize.AddUObject(this, &UOmniTimeManager::LevelUninitialize);
+	PostLevelBeginPlayHandle = FOmniWorldDelegates::OnPostLevelBeginPlay.AddUObject(this, &UOmniTimeManager::PostLevelBeginPlay);
+	LevelEndHandle  = FOmniWorldDelegates::OnLevelEnd.AddUObject(this, &UOmniTimeManager::LevelEnd);
 }
 
 void UOmniTimeManager::BeginDestroy()
 {
-	// 객체 파괴시 델리게이트 명시적 제거. (Broadcast에서 자동 제거)
+	// 객체 파괴시 델리게이트 명시적 제거. (Broadcast시 암시적 제거하지만 명시적으로 제거함.)
 	FWorldDelegates::OnWorldTickStart.Remove(TickStartHandle);
 	FWorldDelegates::OnWorldPreActorTick.Remove(PrevActorTickHandle);
 	// FWorldDelegates::OnWorldPostActorTick.Remove(PostActorTickHandle);
 
-	FOmniWorldDelegates::OnLevelInitialize.Remove(LevelInitializeHandle);
-	FOmniWorldDelegates::OnLevelUninitialize.Remove(LevelUninitializeHandle);
+	FOmniWorldDelegates::OnPostLevelBeginPlay.Remove(PostLevelBeginPlayHandle);
+	FOmniWorldDelegates::OnLevelEnd.Remove(LevelEndHandle);
 
 	UObject::BeginDestroy();
 }
 
 UWorld* UOmniTimeManager::GetWorld() const
 {
-	check(OmniGameInstance.IsValid())
+	check(GetOmniGameInstance())
 
-	UWorld* World = UObject::GetWorld();
-	return World ? World : OmniGameInstance->GetWorld();
+	if (const UOmnibusGameInstance* GameInstance = GetOmniGameInstance())
+		return GameInstance->GetWorld();
+
+	return nullptr;
 }
 
-void UOmniTimeManager::LevelInitialize(UOmnibusGameInstance* InOmniGameInstance)
+void UOmniTimeManager::PostLevelBeginPlay()
 {
 	DaysInLevel          = 0;
 	LevelStartTimeSecond = GetWorld()->GetTime().GetWorldTimeSeconds();
@@ -69,7 +75,7 @@ void UOmniTimeManager::LevelInitialize(UOmnibusGameInstance* InOmniGameInstance)
 	{
 		RealTimerManager->SetTimer(LevelStartRealHandle, [thisWeak = TWeakObjectPtr<UOmniTimeManager>(this)]()
 		{
-			OB_LOG("RealTimer Start")
+			UT_LOG("RealTimer Start")
 
 			UOmniTimeManager* OmniTime = thisWeak.Get();
 			if (OmniTime != nullptr)
@@ -78,12 +84,12 @@ void UOmniTimeManager::LevelInitialize(UOmnibusGameInstance* InOmniGameInstance)
 	}
 	else
 	{
-		OB_LOG("RealTimerManager is not valid.")
+		UT_LOG("RealTimerManager is not valid.")
 		SetGameSpeed(1);
 	}
 }
 
-void UOmniTimeManager::LevelUninitialize(UOmnibusGameInstance* InOmniGameInstance)
+void UOmniTimeManager::LevelEnd()
 {
 	DaysInLevel          = 0;
 	LevelStartTimeSecond = 0.0f;
@@ -144,7 +150,7 @@ void UOmniTimeManager::SetGameSpeed(const int32 InStep)
 
 float UOmniTimeManager::GetGameSpeed()
 {
-	OB_IF(GameSpeedList.IsValidIndex(CurrentGameSpeedStep) == false)
+	UT_IF(GameSpeedList.IsValidIndex(CurrentGameSpeedStep) == false)
 		return 0.0;
 
 	return GameSpeedList[CurrentGameSpeedStep];

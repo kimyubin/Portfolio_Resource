@@ -6,6 +6,7 @@
 #include "Engine/GameInstance.h"
 #include "OmnibusGameInstance.generated.h"
 
+class UOmniOnlineSubsystem;
 class UOmniTimeManager;
 class UOmniPathFinder;
 class UOmnibusPlayData;
@@ -20,11 +21,14 @@ class OMNIBUS_API UOmnibusGameInstance : public UGameInstance
 {
 	GENERATED_BODY()
 
+public:
 	UOmnibusGameInstance();
 	virtual void Init() override;
 	virtual void Shutdown() override;
 
-public:
+	UFUNCTION(BlueprintCallable)
+	void PrevLevelBeginPlay();
+
 	/**
 	 *	GameState의 HandlePostBeginPlay()에서 호출됨.
 	 *	레벨 액터 로드 후, 레벨 초기화 진행.
@@ -32,10 +36,10 @@ public:
 	 *	@see AOmnibusGameStateBase::HandlePostBeginPlay()
 	 */
 	UFUNCTION(BlueprintCallable)
-	void LevelInitializer();
+	void PostLevelBeginPlay();
 
 	UFUNCTION(BlueprintCallable)
-	void LevelUninitializer();
+	void LevelEnd();
 
 	/** OmnibusPlayData 객체 초기화 및 리턴*/
 	UFUNCTION(BlueprintCallable)
@@ -52,6 +56,9 @@ public:
 
 	UFUNCTION()
 	UOmniTimeManager* GetOmniTimeManager() const;
+
+	UFUNCTION()
+	UOmniOnlineSubsystem* GetOmnibusOnlineSubsystem() const;
 
 	/**
 	 *  모든 게임플레이 레벨에서 OmnibusRoadManager에 의해 호출되어 초기화 되어야함.
@@ -81,17 +88,27 @@ private:
 
 	UPROPERTY()
 	UOmniTimeManager* OmniTimeManager;
+
+	UPROPERTY()
+	UOmniOnlineSubsystem* OmniOnlineSubsystem;
+
+	FDelegateHandle PrevLevelBeginPlayHandle;
+	FDelegateHandle PostLevelBeginPlayHandle;
+	FDelegateHandle LevelEndHandle;
 };
 
 class FOmniWorldDelegates
 {
 public:
-	/** 레벨이 시작 시 호출됩니다. 로드되는 액터가 초기화 완료된 후에 작동합니다. */
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnLevelInitialize, UOmnibusGameInstance*);
-	static FOnLevelInitialize OnLevelInitialize;
+	DECLARE_MULTICAST_DELEGATE(FOnPrevLevelBeginPlay);
+	/** 레벨 시작 시 호출됩니다. 모든 액터의 BeginPlay 이전에 브로드캐스팅됩니다.*/
+	static FOnPrevLevelBeginPlay OnPrevLevelBeginPlay;
 
+	DECLARE_MULTICAST_DELEGATE(FOnPostLevelBeginPlay);
+	/** 레벨 시작 시 호출됩니다. 모든 액터의 BeginPlay, PostBeginPlay 이후에 브로드캐스팅됩니다. */
+	static FOnPostLevelBeginPlay OnPostLevelBeginPlay;
+
+	DECLARE_MULTICAST_DELEGATE(FOnLevelEnd);
 	/** 레벨이 종료될 때 호출됩니다. */
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnLevelUninitialize, UOmnibusGameInstance*);
-	static FOnLevelUninitialize OnLevelUninitialize;
-	
+	static FOnLevelEnd OnLevelEnd;
 };

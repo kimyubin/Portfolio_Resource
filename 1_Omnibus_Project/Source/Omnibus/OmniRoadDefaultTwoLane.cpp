@@ -2,12 +2,13 @@
 
 #include "OmniRoadDefaultTwoLane.h"
 
-#include "Omnibus.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniConnectorComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 {
@@ -66,7 +67,7 @@ void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
 	// 현재 도로의 감지용 컴포넌트 순회. 감지된 대상 도로를 찾음.
 	for (UOmniConnectorComponent* const Connector : RoadConnectors)
 	{
-		if (OB_IS_VALID(Connector) == false)
+		if (UT_IS_VALID(Connector) == false)
 			continue;
 
 		// 스플라인 포인트 이동시, 감지용 컴포넌트도 같이 이동함.
@@ -98,7 +99,7 @@ void AOmniRoadDefaultTwoLane::SnapRoadSplineTerminalLocation()
 
 void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 {
-	if (OB_IS_VALID(PlacedMesh) == false || OB_IS_VALID(GetMainRoadSpline()) == false)
+	if (UT_IS_VALID(PlacedMesh) == false || UT_IS_VALID(GetMainRoadSpline()) == false)
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
@@ -117,7 +118,7 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 		
 		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), false, FTransform(), false));
 
-		if (OB_IS_VALID(NewSplineMesh) == false)
+		if (UT_IS_VALID(NewSplineMesh) == false)
 			continue;
 
 		// NewSplineMesh->SetStaticMesh(PlacedMesh);
@@ -136,10 +137,10 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 
 void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 {
-	if ( OB_IS_VALID(PlacedMesh) == false
-		|| OB_IS_VALID(GetMainRoadSpline()) == false
-		|| OB_IS_VALID(GetLaneSpline(0)) == false
-		|| OB_IS_VALID(GetLaneSpline(1)) == false )
+	if ( UT_IS_VALID(PlacedMesh) == false
+		|| UT_IS_VALID(GetMainRoadSpline()) == false
+		|| UT_IS_VALID(GetLaneSpline(0)) == false
+		|| UT_IS_VALID(GetLaneSpline(1)) == false )
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
@@ -258,7 +259,7 @@ int32 AOmniRoadDefaultTwoLane::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmn
 {
 	// 같은 경우, 잘못된 입력.
 	// 시작 지점의 경우, 이전 도로에 nullptr가 오기 때문에 체크 안함.
-	if ((InPrevRoad != InNextTargetRoad) && OB_IS_VALID(InNextTargetRoad))
+	if ((InPrevRoad != InNextTargetRoad) && UT_IS_VALID(InNextTargetRoad))
 	{
 		// 2차선은 이웃 도로의 Idx와 해당 도로로 가는 차선의 번호가 동일.
 		return FindConnectedRoadIdx(InNextTargetRoad);
@@ -274,7 +275,7 @@ USplineComponent* AOmniRoadDefaultTwoLane::GetMainRoadSpline() const
 UStaticMesh* AOmniRoadDefaultTwoLane::GetRoadMesh(const float InLaneLength)
 {
 	// 없는 경우 임시 조치
-	OB_IF(LaneMeshList.IsEmpty())
+	UT_IF(LaneMeshList.IsEmpty())
 		return PlacedMesh;
 
 	for (const FRoadLengthMesh& RoadLengthMesh : LaneMeshList)

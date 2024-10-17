@@ -2,12 +2,15 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UObject/NoExportTypes.h"
+
+#include "OmnibusTypes.h"
+
+#include "UTLStatics.h"
+
 #include <unordered_map>
 
-#include "CoreMinimal.h"
-#include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
-#include "UObject/NoExportTypes.h"
 #include "OmniAsyncTypes.generated.h"
 
 class AOmniPassenger;
@@ -44,7 +47,7 @@ struct weak_eq
 {
 	bool operator()(const TWeakObjectPtr<T>& AStop, const TWeakObjectPtr<T>& BStop) const
 	{
-		return FOmniStatics::IsSameWeak(AStop, BStop);
+		return FUtlStatics::IsSameWeak(AStop, BStop);
 	}
 };
 
@@ -61,36 +64,36 @@ using weak_map = std::unordered_map<TWeakObjectPtr<InKeyType>, InValueType, weak
 
 
 /** 노선이 소유한 데이터 */
-struct FLineData
+struct FLineProxy
 {
-	FLineData();
+	FLineProxy();
 
-	explicit FLineData(const TArray<FBusStopDistance>& InBusStopDistanceList, const float InLineSplineLength);
-	explicit FLineData(TArray<FBusStopDistance>&& InBusStopDistanceList, const float InLineSplineLength);
+	explicit FLineProxy(const TArray<FBusStopDistance>& InBusStopDistanceList, const float InLineSplineLength);
+	explicit FLineProxy(TArray<FBusStopDistance>&& InBusStopDistanceList, const float InLineSplineLength);
 
-	FLineData(const FLineData& Other);
-	FLineData(FLineData&& Other) noexcept;
+	FLineProxy(const FLineProxy& Other);
+	FLineProxy(FLineProxy&& Other) noexcept;
 
-	FLineData& operator=(const FLineData& Other);
-	FLineData& operator=(FLineData&& Other) noexcept;
+	FLineProxy& operator=(const FLineProxy& Other);
+	FLineProxy& operator=(FLineProxy&& Other) noexcept;
 
 	TArray<FBusStopDistance> BusStopDistanceList;
 	float LineSplineLength;
 };
 
 /** 정류장이 소유한 데이터 */
-struct FStopData
+struct FStopProxy
 {
-	FStopData();
+	FStopProxy();
 
-	explicit FStopData(const TArray<TWeakObjectPtr<AOmniLineBusRoute>>& InBusRoutes, const FVector2D& InStopLocation);
-	explicit FStopData(TArray<TWeakObjectPtr<AOmniLineBusRoute>>&& InBusRoutes, FVector2D&& InStopLocation);
+	explicit FStopProxy(const TArray<TWeakObjectPtr<AOmniLineBusRoute>>& InBusRoutes, const FVector2D& InStopLocation);
+	explicit FStopProxy(TArray<TWeakObjectPtr<AOmniLineBusRoute>>&& InBusRoutes, FVector2D&& InStopLocation);
 
-	FStopData(const FStopData& Other);
-	FStopData(FStopData&& Other) noexcept;
+	FStopProxy(const FStopProxy& Other);
+	FStopProxy(FStopProxy&& Other) noexcept;
 
-	FStopData& operator=(const FStopData& Other);
-	FStopData& operator=(FStopData&& Other) noexcept;
+	FStopProxy& operator=(const FStopProxy& Other);
+	FStopProxy& operator=(FStopProxy&& Other) noexcept;
 
 	TArray<TWeakObjectPtr<AOmniLineBusRoute>> BusRoutes;
 	FVector2D StopLocation;
@@ -104,9 +107,9 @@ struct FStopData
  * @tparam InValueType weak_map에 보관할 데이터형입니다.
  */
 template <typename InKeyType, typename InValueType>
-struct FLockPackage
+struct TLockPackage
 {
-	explicit FLockPackage()
+	explicit TLockPackage()
 		: DataMap(weak_map<InKeyType, InValueType>()) {}
 
 	/**
@@ -126,18 +129,18 @@ struct FLockPackage
 
 /** 패키지 내부에 있는 뮤텍스의 읽기 전용 Lock Guard입니다. */
 template <typename InKeyType, typename InValueType>
-class FPackReadLockGuard
+class TPackReadLockGuard
 {
 public:
-	UE_NONCOPYABLE(FPackReadLockGuard);
+	UE_NONCOPYABLE(TPackReadLockGuard);
 
-	UE_NODISCARD_CTOR explicit FPackReadLockGuard(FLockPackage<InKeyType, InValueType>& InLockPack)
+	UE_NODISCARD_CTOR explicit TPackReadLockGuard(TLockPackage<InKeyType, InValueType>& InLockPack)
 		: Lock(InLockPack.MapRWLock)
 	{
 		Lock.ReadLock();
 	}
 
-	~FPackReadLockGuard()
+	~TPackReadLockGuard()
 	{
 		Lock.ReadUnlock();
 	}
@@ -153,7 +156,7 @@ class FPackWriteLockGuard
 public:
 	UE_NONCOPYABLE(FPackWriteLockGuard);
 
-	UE_NODISCARD_CTOR explicit FPackWriteLockGuard(FLockPackage<InKeyType, InValueType>& InLockPack)
+	UE_NODISCARD_CTOR explicit FPackWriteLockGuard(TLockPackage<InKeyType, InValueType>& InLockPack)
 		: Lock(InLockPack.MapRWLock)
 	{
 		Lock.WriteLock();

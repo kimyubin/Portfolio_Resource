@@ -2,7 +2,6 @@
 
 #include "OmnibusTypes.h"
 
-#include "OmnibusUtilities.h"
 #include "OmniCityBlock.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
@@ -10,6 +9,9 @@
 #include "OmniStationBusStop.h"
 #include "OmniVehicleBus.h"
 #include "Components/SplineComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 const FName EOmniComponentTag::StartPoint_RoadSpline("StartPoint_RoadSpline");
 const FName EOmniComponentTag::EndPoint_RoadSpline("EndPoint_RoadSpline");
@@ -90,7 +92,7 @@ FLinearColor FOmniColor::GetNextColorByHue(const uint8 ColorSplitNumber, const u
 
 	static float Hue = (SliceInterval * CountFactor) * 3; // 초기값은 눈에 띄는 색으로
 	Hue += (SliceInterval * CountFactor);
-	Hue = OmniMath::CircularNumF(255.0f, Hue);
+	Hue = UtlMath::CircularNumF(255.0f, Hue);
 	const uint8 Hue8 = static_cast<uint8>(FMath::RoundHalfToEven(Hue));
 
 	// 배경과 대비를 위해 명도를 약간 낮춤.
@@ -125,7 +127,7 @@ bool FLaneInfo::operator==(const FLaneInfo& InLaneInfo) const
 
 USplineComponent* FLaneInfo::GetLaneSpline() const
 {
-	if (OB_IS_WEAK_PTR_VALID(OmniRoad) == false)
+	if (UT_IS_WEAK_PTR_VALID(OmniRoad) == false)
 		return nullptr;
 
 	return OmniRoad->GetLaneSpline(LaneIdx);
@@ -133,7 +135,7 @@ USplineComponent* FLaneInfo::GetLaneSpline() const
 
 float FLaneInfo::GetLength() const
 {
-	if (OB_IS_WEAK_PTR_VALID(OmniRoad) == false)
+	if (UT_IS_WEAK_PTR_VALID(OmniRoad) == false)
 		return FOmniConst::GetBigNumber<float>();
 
 	if(LaneIdx == FLaneInfo::UTURN_LANE)
@@ -151,7 +153,7 @@ float FLaneInfo::GetLength() const
 
 FVector FLaneInfo::GetPointLocation(const int32 InputKey) const
 {
-	if (OB_IS_WEAK_PTR_VALID(OmniRoad) == false)
+	if (UT_IS_WEAK_PTR_VALID(OmniRoad) == false)
 		return FVector::Zero();
 
 	return GetLaneSpline()->GetLocationAtSplinePoint(InputKey, ESplineCoordinateSpace::World);
@@ -189,14 +191,14 @@ FLaneInfo FLaneInfo::UTurnInfo()
 
 TArray<FLaneInfo> FLaneInfo::GetNextLaneInfos() const
 {
-	if (OB_IS_WEAK_PTR_VALID(OmniRoad) == false)
+	if (UT_IS_WEAK_PTR_VALID(OmniRoad) == false)
 		return {};
 
 	TArray<FLaneInfo> Res;
 
 	AOmniRoad* Road     = OmniRoad.Get();
 	AOmniRoad* NextRoad = Road->GetNextRoadByLaneIdx(LaneIdx);
-	OB_IF (NextRoad == nullptr)
+	UT_IF (NextRoad == nullptr)
 		return {};
 
 	const int32 NextRoadConnectNum = NextRoad->GetConnectedRoadNum();
@@ -431,20 +433,59 @@ AOmniStationBusStop* FSectorInfo::GetSectorBusStop() const
 
 //~=============================================================================
 // FSubSector
+FPassengerLocationInfo::EState FPassengerLocationInfo::IndexToEState(const int32 InIdx)
+{
+	switch (InIdx)
+	{
+		case 0: return EState::SubSector;
+		case 1: return EState::BusStop;
+		case 2: return EState::Bus;
+		default: ;
+	}
+	return EState::None;
+}
+
 void FPassengerLocationInfo::EntrySubSector(const FSectorInfo& InSectorInfo)
 {
-	CurrentState  = EState::SubSector;
-	SubSectorInfo = InSectorInfo;
+	EntryLocation(InSectorInfo);
 }
 
 void FPassengerLocationInfo::EntryBusStop(AOmniStationBusStop* InBusStop)
 {
-	CurrentState = EState::BusStop;
-	BusStop      = InBusStop;
+	EntryLocation(InBusStop);
 }
 
 void FPassengerLocationInfo::EntryBus(AOmniVehicleBus* InBus)
 {
-	CurrentState = EState::Bus;
-	Bus          = InBus;
+	EntryLocation(InBus);
+}
+
+void FPassengerLocationInfo::EntryLocation(const FLocationVariant& InLocationVariant)
+{
+	CurrentState = IndexToEState(InLocationVariant.index());
+	LocationInfo = InLocationVariant;
+}
+
+FSectorInfo FPassengerLocationInfo::GetSubSector() const
+{
+	if (ensure(IndexToEState(LocationInfo.index()) == EState::SubSector))
+		return std::get<FSectorInfo>(LocationInfo);
+
+	return {};
+}
+
+AOmniStationBusStop* FPassengerLocationInfo::GetBusStop() const
+{
+	if (ensure(IndexToEState(LocationInfo.index()) == EState::BusStop))
+		return std::get<TWeakObjectPtr<AOmniStationBusStop>>(LocationInfo).Get();
+
+	return nullptr;
+}
+
+AOmniVehicleBus* FPassengerLocationInfo::GetBus() const
+{
+	if (ensure(IndexToEState(LocationInfo.index()) == EState::Bus))
+		return std::get<TWeakObjectPtr<AOmniVehicleBus>>(LocationInfo).Get();
+
+	return nullptr;
 }

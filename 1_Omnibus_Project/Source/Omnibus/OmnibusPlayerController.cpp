@@ -1,20 +1,23 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "OmnibusPlayerController.h"
-#include "InputMappingContext.h"
 
-#include "EnhancedInputSubsystems.h"
-#include "InputTriggers.h"
 #include "OmnibusGameInstance.h"
 #include "OmnibusInputConfig.h"
 #include "OmnibusPlayData.h"
 #include "OmnibusRoadManager.h"
-#include "OmnibusUtilities.h"
 #include "OmniLineBusRoute.h"
 #include "OmniOfficerPawn.h"
 #include "OmniStationBusStop.h"
 #include "OmniTimeManager.h"
+
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "InputTriggers.h"
 #include "Kismet/GameplayStatics.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 
 void AOmnibusPlayerController::BeginPlay()
@@ -59,7 +62,7 @@ void AOmnibusPlayerController::SetupInputComponent()
 void AOmnibusPlayerController::GetMultiHitResultsUnderCursorOnOrthographic(const ECollisionChannel TraceChannel, TArray<FHitResult>& OutHitResults) const
 {
 	const AOmniOfficerPawn* Officer = GetPawn<AOmniOfficerPawn>();
-	if (OB_IS_VALID(Officer) == false)
+	if (UT_IS_VALID(Officer) == false)
 		return;
 
 	// 커서 스크린 좌표를 월드 좌표로 변환.
@@ -106,7 +109,7 @@ void AOmnibusPlayerController::LeftButton(const FInputActionValue& InputValue)
 			if (StartBusStop.Get() == ResultBusStop || StartBusStop->GetOwnerOmniRoad() == ResultBusStop->GetOwnerOmniRoad())
 			{
 				// todo: 적절한 알림 메시지 필요.
-				OB_LOG("Too Close Between BusStops!")
+				UT_LOG("Too Close Between BusStops!")
 				StartBusStop = nullptr;
 				return;
 			}
@@ -136,7 +139,7 @@ void AOmnibusPlayerController::RightButton(const FInputActionValue& InputValue)
 	if (PlayMode == EOmniPlayMode::Move)
 	{
 		AOmniOfficerPawn* const Officer = GetPawn<AOmniOfficerPawn>();
-		if (OB_IS_VALID(Officer))
+		if (UT_IS_VALID(Officer))
 		{
 			const bool bActive = InputValue.Get<bool>();
 			Officer->SetDragActive(bActive, GetMousePosVector2D());
@@ -155,7 +158,7 @@ void AOmnibusPlayerController::Drag(const FInputActionValue& InputValue)
 	if (PlayMode == EOmniPlayMode::Move)
 	{
 		AOmniOfficerPawn* const Officer = GetPawn<AOmniOfficerPawn>();
-		if (OB_IS_VALID(Officer))
+		if (UT_IS_VALID(Officer))
 			Officer->DragMap(GetMousePosVector2D());
 	}
 }

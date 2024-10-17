@@ -16,7 +16,11 @@ public class Omnibus : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"UMG",
-			"AIModule"
+			"AIModule",
+			"OnlineSubsystem",
+			"OnlineSubsystemSteam"
+
+			, "Utilibrary"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

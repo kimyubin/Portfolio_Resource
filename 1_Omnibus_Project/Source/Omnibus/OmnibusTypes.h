@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <variant>
+
 #include "CoreMinimal.h"
 #include "Templates/TypeHash.h"
 #include "OmnibusTypes.generated.h"
@@ -681,35 +683,47 @@ enum class EJourneyDirection
 	DestToHome,
 };
 
+/** 다음 구조의 익명 union을 대체함.
+ 	union
+	{
+		FSectorInfo SubSectorInfo;
+		TWeakObjectPtr<AOmniStationBusStop> BusStop;
+		TWeakObjectPtr<AOmniVehicleBus> Bus;
+	};
+ */
+using FLocationVariant = std::variant<FSectorInfo, TWeakObjectPtr<AOmniStationBusStop>, TWeakObjectPtr<AOmniVehicleBus>>;
+
 /** 승객의 위치 정보 */
 USTRUCT()
 struct FPassengerLocationInfo
 {
 	GENERATED_BODY()
 	FPassengerLocationInfo()
-		: SubSectorInfo(), CurrentState(EState::None) {}
+		: LocationInfo(), CurrentState(EState::None) {}
 
 	/** 현재위치 */
-	enum class EState
+	enum class EState : uint8
 	{
 		None, Disable, SubSector, BusStop, Bus, Sidewalk,
 	};
 
-	// 소속된 곳 정보
-	union
-	{
-		FSectorInfo SubSectorInfo;
-		TWeakObjectPtr<AOmniStationBusStop> BusStop;
-		TWeakObjectPtr<AOmniVehicleBus> Bus;
-	};
-
-	EState CurrentState;
+	/** FLocationVariant의 index로 EState를 찾습니다. */
+	static EState IndexToEState(const int32 InIdx);
 
 	void EntrySubSector(const FSectorInfo& InSectorInfo);
 	void EntryBusStop(AOmniStationBusStop* InBusStop);
 	void EntryBus(AOmniVehicleBus* InBus);
+	void EntryLocation(const FLocationVariant& InLocationVariant);
 
-	EState GetCurrentState() const { return CurrentState; }
+	EState               GetCurrentState() const { return CurrentState; }
+	FSectorInfo          GetSubSector() const;
+	AOmniStationBusStop* GetBusStop() const;
+	AOmniVehicleBus*     GetBus() const;
+
+private:
+	/** 현재 위치한 곳 */
+	FLocationVariant LocationInfo;
+	EState CurrentState;
 };
 
 /** 현재 여정 상태 */

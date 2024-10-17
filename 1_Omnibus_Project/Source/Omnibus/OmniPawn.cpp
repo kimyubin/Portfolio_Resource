@@ -3,7 +3,7 @@
 #include "OmniPawn.h"
 
 #include "OmnibusGameInstance.h"
-#include "OmnibusUtilities.h"
+
 
 AOmniPawn::AOmniPawn()
 {

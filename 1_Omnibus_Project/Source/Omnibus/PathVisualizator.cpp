@@ -5,10 +5,12 @@
 
 #include "OmnibusPlayData.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniLineBusRoute.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 
 APathVisualizator::APathVisualizator()
@@ -36,7 +38,7 @@ void APathVisualizator::MakeSplineMesh(const FVector& InStartLoc, const FVector&
 	USplineMeshComponent* const NewSplineMesh
 			= Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), bManualAttachment, FTransform(), true));
 
-	if (OB_IS_VALID(NewSplineMesh) == false)
+	if (UT_IS_VALID(NewSplineMesh) == false)
 		return;
 
 	NewSplineMesh->SetStaticMesh(GetOmnibusPlayData()->GetPathVisualMesh());
@@ -132,7 +134,7 @@ void APathVisualizator::VisualizeTransferRoutes(const FTransferPath& InTransferP
 		const int32 LineSplinePointNum = LineSpline->GetNumberOfSplinePoints();
 		For_CircularRange(PointIdx, StartNextPointIndex, EndPrevPointIndex, LineSplinePointNum)
 		{
-			const int NextIdx = OmniMath::CircularNum(LineSplinePointNum - 1, PointIdx + 1);
+			const int NextIdx = UtlMath::CircularNum(LineSplinePointNum - 1, PointIdx + 1);
 			StartLoc          = LineSpline->GetLocationAtSplinePoint(PointIdx, CoordSpace);
 			StartTangent      = LineSpline->GetLeaveTangentAtSplinePoint(PointIdx, CoordSpace);
 			EndLoc            = LineSpline->GetLocationAtSplinePoint(NextIdx, CoordSpace);

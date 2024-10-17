@@ -56,3 +56,32 @@ protected:
 	UFUNCTION()
 	virtual UOmniTimeManager* GetOmniTimeManager() const = 0;
 };
+
+
+
+//~=============================================================================
+/* 객체 ID 생성용 */
+UCLASS()
+class OMNIBUS_API UOmniID : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	static uint64 GenerateID_Number(const AActor* InActor);
+
+	/**
+	 * 상위 19bit : 날짜 정보. 10bit(연) : 1900 ~ 2924, 4bit(월) : 1~12, 5bit(일) : 1~31
+	 * 중위 17bit : 실행 시간 초
+	 * 하위 28bit : 일일 생성 순번
+	 */
+	static uint64 GenerateID_NumberByDate();
+	static FString GetID_DateToString(const uint64 InID);
+
+	/** 액터가 스폰된 위치와 레벨 기반으로 ID 생성. */
+	static uint64 GenerateID_NumberByPos(const AActor* InActor);
+	static uint64 GenerateID_NumberByHash(const AActor* InActor);
+	static FString GetID_InfoToString(const uint64 InID);
+
+private:
+	static std::atomic<uint64> ID_TodayCountAtomic;
+};

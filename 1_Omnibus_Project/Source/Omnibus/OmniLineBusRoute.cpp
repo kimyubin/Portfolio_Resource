@@ -3,15 +3,10 @@
 
 #include "OmniLineBusRoute.h"
 
-#include <queue>
-#include <unordered_map>
-
 #include "OmniAsync.h"
-#include "OmnibusTypes.h"
-#include "Omnibus.h"
 #include "OmnibusPlayData.h"
 #include "OmnibusRoadManager.h"
-#include "OmnibusUtilities.h"
+#include "OmnibusTypes.h"
 #include "OmniRoad.h"
 #include "OmniStationBusStop.h"
 #include "OmniVehicleBus.h"
@@ -19,15 +14,20 @@
 #include "Components/SplineMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 
+#include "UtlLog.h"
+#include "UTLStatics.h"
+
+#include <queue>
+#include <unordered_map>
+
 AOmniLineBusRoute::AOmniLineBusRoute()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComponent->SetMobility(EComponentMobility::Stationary);
-	
 
-	const FName RoadSplineName = OmniStr::ConcatStrInt(TEXT("RouteSpline"), 0);
+	const FName RoadSplineName = UtlStr::ConcatStrInt(TEXT("RouteSpline"), 0);
 	RouteSpline = CreateDefaultSubobject<USplineComponent>(RoadSplineName);
 	RouteSpline->SetupAttachment(RootComponent);
 
@@ -46,7 +46,7 @@ void AOmniLineBusRoute::BeginPlay()
 	RouteSpline->SetUnselectedSplineSegmentColor(LineColor);
 
 	// 노선 데이터 등록
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 
 	// 비긴플레이 : 마우스 클릭으로 스폰 시.
 	AOmnibusRoadManager* RoadManager = GetOmnibusRoadManager();
@@ -73,7 +73,7 @@ void AOmniLineBusRoute::PostBeginPlay()
 void AOmniLineBusRoute::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	// 노선 데이터 삭제
-	FOmniAsync::DeleteLineDataAsync(this);
+	FOmniAsync::DeleteLineProxyAsync(this);
 	
 	ClearBusStopList();
 	Super::EndPlay(EndPlayReason);
@@ -89,7 +89,7 @@ TArray<FLaneInfo> AOmniLineBusRoute::FindLanePathByWayPoints(const TArray<TWeakO
 {
 	if (InBusStops.Num() < 2)
 	{
-		OB_LOG("Too little BusStops")
+		UT_LOG("Too little BusStops")
 		return {};
 	}
 
@@ -98,7 +98,7 @@ TArray<FLaneInfo> AOmniLineBusRoute::FindLanePathByWayPoints(const TArray<TWeakO
 	for (int RouteIdx = 0; RouteIdx < InBusStops.Num() - 1; ++RouteIdx)
 	{
 		TArray<FLaneInfo> TempLaneInfos = FindLanePath(InBusStops[RouteIdx].Get(), InBusStops[RouteIdx + 1].Get());
-		OB_IF(TempLaneInfos.Num() <= 0 || TempLaneInfos.Num() > 1'000)
+		UT_IF(TempLaneInfos.Num() <= 0 || TempLaneInfos.Num() > 1'000)
 			return {};
 
 		// 중복제거
@@ -183,7 +183,7 @@ TArray<FLaneInfo> AOmniLineBusRoute::FindLanePath(const AOmniStationBusStop* InS
 			InCurrent = InCameFrom.at(InCurrent);
 			if (InOutPath.Num() > 1'000'000)
 			{
-				OB_LOG("Loop Max Over")
+				UT_LOG("Loop Max Over")
 				InOutPath.Empty();
 				return;
 			}
@@ -262,12 +262,12 @@ TArray<FLaneInfo> AOmniLineBusRoute::ReconstructLanePathByRoads(const TArray<FLa
 	AOmniRoad* const LastSecondRoad = InRouteRoads.Last(1).OmniRoad.Get();
 	AOmniRoad* const LastFirstRoad  = InRouteRoads.Last(0).OmniRoad.Get();
 
-	if (OB_IS_VALID(FirstRoad) == false || OB_IS_VALID(SecondRoad) == false)
+	if (UT_IS_VALID(FirstRoad) == false || UT_IS_VALID(SecondRoad) == false)
 		return OutNewLanePath;
 
 	// 시작 도로 차선 추가.
 	const int32 FirstRoadLaneIdx = FirstRoad->FindLaneIdxToNextRoad(nullptr, SecondRoad);
-	OB_IF (FirstRoadLaneIdx == INDEX_NONE)
+	UT_IF (FirstRoadLaneIdx == INDEX_NONE)
 		return OutNewLanePath;
 
 	OutNewLanePath.Emplace(FirstRoad, FirstRoadLaneIdx);
@@ -282,7 +282,7 @@ TArray<FLaneInfo> AOmniLineBusRoute::ReconstructLanePathByRoads(const TArray<FLa
 		if (PrevRoad != NextRoad)
 		{
 			const int32 CurrentLaneIdx = CurrentRoad->FindLaneIdxToNextRoad(PrevRoad, NextRoad);
-			OB_IF (CurrentLaneIdx == INDEX_NONE)
+			UT_IF (CurrentLaneIdx == INDEX_NONE)
 				return OutNewLanePath;
 
 			OutNewLanePath.Emplace(CurrentRoad, CurrentLaneIdx);
@@ -300,7 +300,7 @@ TArray<FLaneInfo> AOmniLineBusRoute::ReconstructLanePathByRoads(const TArray<FLa
 	}
 
 	const int32 LastRoadLaneIdx = LastFirstRoad->FindLaneIdxToNextRoad(nullptr, LastSecondRoad);
-	OB_IF(LastRoadLaneIdx == INDEX_NONE)
+	UT_IF(LastRoadLaneIdx == INDEX_NONE)
 		return OutNewLanePath;
 
 	OutNewLanePath.Emplace(LastFirstRoad, (LastRoadLaneIdx == 0) ? 1 : 0);
@@ -315,7 +315,7 @@ void AOmniLineBusRoute::InitializeRoute(const TArray<TWeakObjectPtr<AOmniStation
 
 	UpdateRouteSpline();
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::InitRoutePathAndBus(const TArray<TWeakObjectPtr<AOmniStationBusStop>>& InWayPointList)
@@ -323,7 +323,7 @@ void AOmniLineBusRoute::InitRoutePathAndBus(const TArray<TWeakObjectPtr<AOmniSta
 	InitializeRoute(InWayPointList);
 
 	// check(BusStopDistanceList.IsEmpty()==false)
-	OB_IF (BusStopDistanceList.IsEmpty())
+	UT_IF (BusStopDistanceList.IsEmpty())
 		return;
 
 	SpawnBusOnRoute(ECarType::Blue_Basic, BusStopDistanceList[0].Distance - 500.0f);
@@ -341,22 +341,22 @@ void AOmniLineBusRoute::InsertWayPointInRoute(const int32 InFrontWayPointIdx, AO
 
 	UpdateRouteSpline();
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 
 #else
 	// 2안 : 부분만 찾기. 예외처리가 필요할 수 있음.
-	OB_IF (WayPointStopList.IsValidIndex(InFrontWayPointIdx) == false)
+	UT_IF (WayPointStopList.IsValidIndex(InFrontWayPointIdx) == false)
 		return;
 
 	AOmniStationBusStop* FrontBusStop = WayPointStopList[InFrontWayPointIdx].Get();
-	OB_IF (FrontBusStop == nullptr)
+	UT_IF (FrontBusStop == nullptr)
 		return;
-	OB_IF (FrontBusStop == InAddBusStop)
+	UT_IF (FrontBusStop == InAddBusStop)
 		return;
 
-	const int BackBusStopIdx         = OmniMath::CircularNum(WayPointStopList.Num() - 1, InFrontWayPointIdx + 1);
+	const int BackBusStopIdx         = UtlMath::CircularNum(WayPointStopList.Num() - 1, InFrontWayPointIdx + 1);
 	AOmniStationBusStop* BackBusStop = WayPointStopList[BackBusStopIdx].Get();
-	OB_IF (BackBusStop == InAddBusStop)
+	UT_IF (BackBusStop == InAddBusStop)
 		return;;
 
 
@@ -388,7 +388,7 @@ void AOmniLineBusRoute::InsertWayPointInRoute(const int32 InFrontWayPointIdx, AO
 	// 뭔가 이상하지만, 순환 마지막-처음 연결을 고려.
 	// FrontPathIdx+1 ~ Last() ~ [0] ~ FrontPathIdx-1 까지 탐색.
 	int BackPathIdx = (FrontPathIdx + 1);
-	for (; BackPathIdx != FrontPathIdx; BackPathIdx = OmniMath::CircularNum(LaneInfoRoute.Num() - 1, ++BackPathIdx))
+	for (; BackPathIdx != FrontPathIdx; BackPathIdx = UtlMath::CircularNum(LaneInfoRoute.Num() - 1, ++BackPathIdx))
 	{
 		if (LaneInfoRoute[BackPathIdx].OmniRoad == BackRoad)
 			break;
@@ -411,18 +411,18 @@ void AOmniLineBusRoute::InsertWayPointInRoute(const int32 InFrontWayPointIdx, AO
 	
 	UpdateRouteSpline();
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 #endif
 }
 
 void AOmniLineBusRoute::SpawnBusOnRoute(const ECarType InSpawnCarType, const float InSpawnRouteDist)
 {
-	const double CircularDist = OmniMath::CircularNumF(RouteSpline->GetSplineLength(), InSpawnRouteDist);
+	const double CircularDist = UtlMath::CircularNumF(RouteSpline->GetSplineLength(), InSpawnRouteDist);
 	const FVector Location    = RouteSpline->GetLocationAtDistanceAlongSpline(CircularDist, ESplineCoordinateSpace::World);
 	const FVector Direction   = RouteSpline->GetDirectionAtDistanceAlongSpline(CircularDist, ESplineCoordinateSpace::World);
 	
 	// 회전은 Yaw만 반영. 다른 축은 -0.0 등 미세한 오류가 포함되어 있을 수 있으므로 무시.
-	const FRotator Rotator    = OmniMath::YawRotator(Direction.Rotation());
+	const FRotator Rotator    = UtlMath::YawRotator(Direction.Rotation());
 
 	const FTransform SpawnTrans = FTransform(Rotator, Location);
 	SpawnBusByTransform(SpawnTrans, InSpawnCarType, InSpawnRouteDist);
@@ -466,20 +466,20 @@ void AOmniLineBusRoute::UpdateRouteSpline()
 	}
 	for (const int32 UturnPoint : UturnPoints)
 	{
-		MakeUTurnRouteSpline(UturnPoint, OmniMath::CircularNum(RouteSpline->GetNumberOfSplinePoints() - 1, UturnPoint + 1));
+		MakeUTurnRouteSpline(UturnPoint, UtlMath::CircularNum(RouteSpline->GetNumberOfSplinePoints() - 1, UturnPoint + 1));
 	}
 
 	RouteSpline->SetClosedLoop(true);
 
 	CreateSplineMeshComponents();
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::PushLaneAndBusStops(const FLaneInfo& InLaneInfo)
 {
 	auto [AddLaneSpline, BusStopsOnLane] = InLaneInfo.OmniRoad->GetLaneAndBusStop(InLaneInfo.LaneIdx);
-	if (OB_IS_VALID(AddLaneSpline) == false)
+	if (UT_IS_VALID(AddLaneSpline) == false)
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::World;
@@ -512,7 +512,7 @@ void AOmniLineBusRoute::PushLaneAndBusStops(const FLaneInfo& InLaneInfo)
 	// 정류장 추가.
 	AppendBusStopDist(BusStopsOnLane, AddLaneSpline->GetSplineLength());
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::AppendBusStopDist(TArray<FBusStopDistance>& InOutAddBusStopList, const float InAddedLaneLength)
@@ -534,7 +534,7 @@ void AOmniLineBusRoute::AppendBusStopDist(TArray<FBusStopDistance>& InOutAddBusS
 
 	BusStopDistanceList.Append(InOutAddBusStopList);
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int32 InEndPoint)
@@ -601,7 +601,7 @@ void AOmniLineBusRoute::MakeUTurnRouteSpline(const int32 InStartPoint, const int
 		}
 	}
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::CreateSplineMeshComponents()
@@ -638,7 +638,7 @@ void AOmniLineBusRoute::CreateSplineMeshComponents()
 
 		USplineMeshComponent* const NewSplineMesh = Cast<USplineMeshComponent>(AddComponentByClass(USplineMeshComponent::StaticClass(), bManualAttachment, FTransform(), true));
 
-		if (OB_IS_VALID(NewSplineMesh) == false)
+		if (UT_IS_VALID(NewSplineMesh) == false)
 			continue;
 
 		NewSplineMesh->SetStaticMesh(BusLineMesh);
@@ -660,7 +660,12 @@ void AOmniLineBusRoute::CreateSplineMeshComponents()
 		FinishAddComponent(NewSplineMesh, bManualAttachment, FTransform());
 	}
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
+}
+
+USplineComponent* AOmniLineBusRoute::GetRouteSpline() const
+{
+	return RouteSpline;
 }
 
 float AOmniLineBusRoute::GetRouteLength() const
@@ -675,15 +680,20 @@ TArray<FBusStopDistance> AOmniLineBusRoute::GetBusStopDistanceList() const
 
 FBusStopDistance AOmniLineBusRoute::GetBusStopDist(const int32 InIdx) const
 {
-	OB_IF(BusStopDistanceList.IsValidIndex(InIdx) == false)
+	UT_IF(BusStopDistanceList.IsValidIndex(InIdx) == false)
 		return FBusStopDistance();
 	
 	return BusStopDistanceList[InIdx];
 }
 
+FLinearColor AOmniLineBusRoute::GetLineColor() const
+{
+	return LineColor;
+}
+
 TArray<int32> AOmniLineBusRoute::FindBusStopIdxList(AOmniStationBusStop* InBusStop) const
 {
-	return OmniContainer::FindAllIndexByPredicate(BusStopDistanceList, [InBusStopWeak = TWeakObjectPtr<AOmniStationBusStop>(InBusStop)](const FBusStopDistance& InStopDistance)
+	return UtlContainer::FindAllIndexByPredicate(BusStopDistanceList, [InBusStopWeak = TWeakObjectPtr<AOmniStationBusStop>(InBusStop)](const FBusStopDistance& InStopDistance)
 	{
 		return InStopDistance.BusStop == InBusStopWeak;
 	});
@@ -691,7 +701,7 @@ TArray<int32> AOmniLineBusRoute::FindBusStopIdxList(AOmniStationBusStop* InBusSt
 
 float AOmniLineBusRoute::GetShortPathLength(const int32 InStartBusIdx, const int32 InEndBusIdx)
 {
-	OB_IF(BusStopDistanceList.IsValidIndex(InStartBusIdx) == false || BusStopDistanceList.IsValidIndex(InEndBusIdx) == false)
+	UT_IF(BusStopDistanceList.IsValidIndex(InStartBusIdx) == false || BusStopDistanceList.IsValidIndex(InEndBusIdx) == false)
 		return FOmniConst::GetBigNumber<float>();
 
 	// 한바퀴 돈 경우 고려
@@ -715,7 +725,7 @@ int32 AOmniLineBusRoute::FindThisStopIdxByDist(const float InDist)
 
 int32 AOmniLineBusRoute::GetNextBusStopIdx(const int32 InCurrentIdx) const
 {
-	return OmniMath::CircularNum(BusStopDistanceList.Num() - 1, InCurrentIdx + 1);
+	return UtlMath::CircularNum(BusStopDistanceList.Num() - 1, InCurrentIdx + 1);
 }
 
 void AOmniLineBusRoute::UnlinkBusStop(AOmniStationBusStop* InBusStop)
@@ -730,7 +740,7 @@ void AOmniLineBusRoute::UnlinkBusStop(AOmniStationBusStop* InBusStop)
 		return (InStop == nullptr) || (InStop == InBusStop);
 	});
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 void AOmniLineBusRoute::ClearBusStopList()
@@ -744,14 +754,14 @@ void AOmniLineBusRoute::ClearBusStopList()
 
 	BusStopDistanceList.Empty();
 
-	FOmniAsync::UpdateLineDataAsync(this);
+	FOmniAsync::UpdateLineProxyAsync(this);
 }
 
 float AOmniLineBusRoute::GetRenderOrderOffset()
 {
 	static float LineOffset = 0.0f;
 
-	return OmniMath::CircularNumF(10.0, LineOffset += 0.1f) + 1.0f;
+	return UtlMath::CircularNumF(10.0, LineOffset += 0.1f) + 1.0f;
 }
 
 void AOmniLineBusRoute::SetRouteRender(const bool InVisibility)
@@ -774,12 +784,12 @@ std::tuple<int32, float> AOmniLineBusRoute::GetShortestStartIdxAndDist(const TAr
 
 	// BusStopDistanceList에서 버스 정류장이 위치를 모두 찾음.
 	// 정류장을 2회 이상 지나가는 것을 고려.
-	TArray<int32> StartLaneIdxList = OmniContainer::FindAllIndexByPredicate(InBusStopDistanceList, [InStartBusStop](const FBusStopDistance& InStopDistance)
+	TArray<int32> StartLaneIdxList = UtlContainer::FindAllIndexByPredicate(InBusStopDistanceList, [InStartBusStop](const FBusStopDistance& InStopDistance)
 	{
-		return FOmniStatics::IsSameWeak(InStopDistance.BusStop, InStartBusStop);
+		return FUtlStatics::IsSameWeak(InStopDistance.BusStop, InStartBusStop);
 	});
 
-	OB_IF(StartLaneIdxList.IsEmpty())
+	UT_IF(StartLaneIdxList.IsEmpty())
 		return std::make_tuple(StartStopIdx, ShortestDist);
 
 	for (const int32 StartIdx : StartLaneIdxList)
@@ -807,9 +817,9 @@ void AOmniLineBusRoute::GenerateRandomRoute()
 
 	const int32 StopsLastIdx = RandBusStops.Num() - 1;
 
-	AOmniStationBusStop* StartStop = Cast<AOmniStationBusStop>(RandBusStops[OmniMath::GetIntRandom(0, StopsLastIdx)]);
-	AOmniStationBusStop* MidStop   = Cast<AOmniStationBusStop>(RandBusStops[OmniMath::GetIntRandom(0, StopsLastIdx)]);
-	AOmniStationBusStop* EndStop   = Cast<AOmniStationBusStop>(RandBusStops[OmniMath::GetIntRandom(0, StopsLastIdx)]);
+	AOmniStationBusStop* StartStop = Cast<AOmniStationBusStop>(RandBusStops[UtlMath::GetIntRandom(0, StopsLastIdx)]);
+	AOmniStationBusStop* MidStop   = Cast<AOmniStationBusStop>(RandBusStops[UtlMath::GetIntRandom(0, StopsLastIdx)]);
+	AOmniStationBusStop* EndStop   = Cast<AOmniStationBusStop>(RandBusStops[UtlMath::GetIntRandom(0, StopsLastIdx)]);
 
 	for (int LoopCount = 0; LoopCount < 1'000; ++LoopCount)
 	{
@@ -819,10 +829,10 @@ void AOmniLineBusRoute::GenerateRandomRoute()
 			break;
 
 		if (StartStop->GetOwnerOmniRoad() == MidStop->GetOwnerOmniRoad())
-			MidStop = Cast<AOmniStationBusStop>(RandBusStops[OmniMath::GetIntRandom(0, StopsLastIdx)]);
+			MidStop = Cast<AOmniStationBusStop>(RandBusStops[UtlMath::GetIntRandom(0, StopsLastIdx)]);
 
 		if (MidStop->GetOwnerOmniRoad() == EndStop->GetOwnerOmniRoad())
-			EndStop = Cast<AOmniStationBusStop>(RandBusStops[OmniMath::GetIntRandom(0, StopsLastIdx)]);
+			EndStop = Cast<AOmniStationBusStop>(RandBusStops[UtlMath::GetIntRandom(0, StopsLastIdx)]);
 	}
 
 	InitRoutePathAndBus({StartStop, MidStop, EndStop, StartStop});

@@ -5,7 +5,6 @@
 
 #include "OmniAsync.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniCityBlock.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
@@ -14,6 +13,9 @@
 #include "OmniVehicleBus.h"
 #include "Components/BoxComponent.h"
 #include "Components/SplineComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 AOmniStationBusStop::AOmniStationBusStop()
 {
@@ -58,7 +60,7 @@ void AOmniStationBusStop::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	FOmniAsync::UpdateStopDataAsync(this);
+	FOmniAsync::UpdateStopProxyAsync(this);
 }
 
 void AOmniStationBusStop::Destroyed()
@@ -71,7 +73,7 @@ void AOmniStationBusStop::Destroyed()
 
 void AOmniStationBusStop::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	FOmniAsync::DeleteStopDataAsync(this);
+	FOmniAsync::DeleteStopProxyAsync(this);
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -89,16 +91,16 @@ void AOmniStationBusStop::SearchRoadAndBlock()
 	// 게임 시작 후, 도로에 붙어있는 지 확인.
 	if (GetWorld() != nullptr && GetWorld()->GetBegunPlay() == true)
 	{
-		if (OB_IS_WEAK_PTR_VALID(OwnerOmniRoad) == false)// || OB_IS_WEAK_PTR_VALID(OwnerOmniCityBlock) == false)
+		if (UT_IS_WEAK_PTR_VALID(OwnerOmniRoad) == false)// || UT_IS_WEAK_PTR_VALID(OwnerOmniCityBlock) == false)
 		{
-			OB_LOG("%s No Road or Block Detected", *GetActorNameOrLabel())
+			UT_LOG("%s No Road or Block Detected", *GetActorNameOrLabel())
 		}
 	}
 }
 
 void AOmniStationBusStop::SearchRoad()
 {
-	FOmniAsync::UpdateStopDataAsync(this);
+	FOmniAsync::UpdateStopProxyAsync(this);
 	
 	UClass* TargetClass       = AOmniRoadDefaultTwoLane::StaticClass();
 	AOmniRoad* NearRoad       = nullptr;
@@ -106,7 +108,7 @@ void AOmniStationBusStop::SearchRoad()
 	const bool IsDetectedRoad = DetectRoadAndLane(TargetClass, NearRoad, OwnerLaneIndex);
 
 	// 감지 실패 시 연결 해제.
-	if (IsDetectedRoad == false || OB_IS_VALID(NearRoad) == false || NearRoad->IsA(TargetClass) == false)
+	if (IsDetectedRoad == false || UT_IS_VALID(NearRoad) == false || NearRoad->IsA(TargetClass) == false)
 	{
 		UnlinkOwnerOmniRoad();
 		return;
@@ -137,14 +139,14 @@ void AOmniStationBusStop::SearchRoad()
 
 void AOmniStationBusStop::SearchCityBlock()
 {
-	FOmniAsync::UpdateStopDataAsync(this);
+	FOmniAsync::UpdateStopProxyAsync(this);
 	
 	UClass* CityBlockClass        = AOmniCityBlock::StaticClass();
 	AOmniCityBlock* NearCityBlock = nullptr;
 	const bool IsDetectCityBlock  = DetectCityBlock(CityBlockClass, NearCityBlock);
 
 	// 감지 실패 시 연결 해제.
-	if (IsDetectCityBlock == false || OB_IS_VALID(NearCityBlock) == false || NearCityBlock->IsA(CityBlockClass) == false)
+	if (IsDetectCityBlock == false || UT_IS_VALID(NearCityBlock) == false || NearCityBlock->IsA(CityBlockClass) == false)
 	{
 		UnlinkOwnerOmniCityBlock();
 		return;
@@ -156,7 +158,7 @@ void AOmniStationBusStop::SearchCityBlock()
 bool AOmniStationBusStop::DetectRoadAndLane(UClass* InClassFilter, AOmniRoad*& OutNearRoad, int32& OutNearLaneIdx) const
 {
 	TArray<AActor*> OverlappingActors;
-	const bool IsOverlap = FOmniStatics::GetOverlapActors(StationDetector, InClassFilter, OverlappingActors);
+	const bool IsOverlap = FUtlStatics::GetOverlapActors(StationDetector, InClassFilter, OverlappingActors);
 
 	if (IsOverlap == false)
 		return false;
@@ -172,13 +174,13 @@ bool AOmniStationBusStop::DetectCityBlock(UClass* InClassFilter, AOmniCityBlock*
 {
 	OutCityBlock = nullptr;
 	TArray<AActor*> OverlappingActors;
-	const bool IsOverlap = FOmniStatics::GetOverlapActors(StationDetector, InClassFilter, OverlappingActors);
+	const bool IsOverlap = FUtlStatics::GetOverlapActors(StationDetector, InClassFilter, OverlappingActors);
 
 	if (IsOverlap == false)
 		return false;
 
 	if (OverlappingActors.Num() >= 2)
-		OB_LOG("A BusStop has detected multiple CityBlocks.")
+		UT_LOG("A BusStop has detected multiple CityBlocks.")
 
 	AActor** FindPtr = OverlappingActors.FindByPredicate([InClassFilter](const AActor* InOverlap) -> bool
 	{
@@ -199,7 +201,7 @@ AOmniRoad* AOmniStationBusStop::GetOwnerOmniRoad() const
 
 void AOmniStationBusStop::UpdateOwnerOmniRoad(AOmniRoad* InOwnerOmniRoad)
 {
-	if (OB_IS_VALID(InOwnerOmniRoad) == false)
+	if (UT_IS_VALID(InOwnerOmniRoad) == false)
 		return;
 
 	// 옮기면 이전 도로 연결 해제
@@ -225,7 +227,7 @@ AOmniCityBlock* AOmniStationBusStop::GetOwnerOmniCityBlock() const
 
 void AOmniStationBusStop::UpdateOwnerOmniCityBlock(AOmniCityBlock* InOwnerOmniCityBlock)
 {
-	if (OB_IS_VALID(InOwnerOmniCityBlock) == false)
+	if (UT_IS_VALID(InOwnerOmniCityBlock) == false)
 		return;
 
 	// 옮기면 이전 도로 연결 해제
@@ -246,14 +248,14 @@ void AOmniStationBusStop::UnlinkOwnerOmniCityBlock()
 
 void AOmniStationBusStop::AddBusRoute(AOmniLineBusRoute* InRoute)
 {
-	FOmniAsync::UpdateStopDataAsync(this);
+	FOmniAsync::UpdateStopProxyAsync(this);
 
 	BusRouteList.Emplace(InRoute);
 }
 
 void AOmniStationBusStop::RemoveBusRoute(AOmniLineBusRoute* InRoute)
 {
-	FOmniAsync::UpdateStopDataAsync(this);
+	FOmniAsync::UpdateStopProxyAsync(this);
 
 	// 버스노선 제거하는 김에 유효하지 않은 버스 노선 제거.
 	if (IsValid(InRoute))

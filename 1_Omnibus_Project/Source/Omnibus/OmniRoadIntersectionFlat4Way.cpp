@@ -2,11 +2,12 @@
 
 #include "OmniRoadIntersectionFlat4Way.h"
 
-#include "OmnibusUtilities.h"
 #include "OmnibusTypes.h"
-
 #include "OmniConnectorComponent.h"
 #include "Components/SplineComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 // Sets default values
 AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
@@ -27,7 +28,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 
 		if (RoadSplines.IsValidIndex(RoadIdx) == false)
 		{
-			OB_LOG("RoadSplines Invalid Index %d", RoadIdx)
+			UT_LOG("RoadSplines Invalid Index %d", RoadIdx)
 			return;
 		}
 		
@@ -40,7 +41,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 		InitLaneSpline(i, GetRoadSpline(i / 6));
 	}
 
-	const FName Mesh = OmniStr::ConcatStrInt(TEXT("Flat4WayMesh"), 0);
+	const FName Mesh = UtlStr::ConcatStrInt(TEXT("Flat4WayMesh"), 0);
 	Flat4WayMesh     = CreateDefaultSubobject<UStaticMeshComponent>(Mesh);
 	Flat4WayMesh->SetupAttachment(RootComponent);
 	Flat4WayMesh->SetMobility(EComponentMobility::Static);
@@ -52,7 +53,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	if (OB_IS_VALID(PlacedMesh))
+	if (UT_IS_VALID(PlacedMesh))
 	{
 		Flat4WayMesh->SetStaticMesh(PlacedMesh);
 		Flat4WayMesh->SetMobility(EComponentMobility::Static);
@@ -77,7 +78,7 @@ void AOmniRoadIntersectionFlat4Way::Tick(float DeltaTime)
 
 void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 {
-	if (OB_IS_VALID(Flat4WayMesh) == false || OB_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
+	if (UT_IS_VALID(Flat4WayMesh) == false || UT_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return;
 
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
@@ -107,7 +108,7 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 
 	for (UOmniConnectorComponent* const Connector : RoadConnectors)
 	{
-		if (OB_IS_VALID(Connector))
+		if (UT_IS_VALID(Connector))
 			Connector->SetRelativeTransformToSpline();
 	}
 
@@ -118,9 +119,9 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 		const int LaneIdx  = i * 3; // 4개 방향 출발지 마다 3개 차선씩(좌,우회전, 직진 차선). 차선 12개. 3개 묶어서 계산.
 		const int PointIdx = i * 2; // 4개 방향 마다 출입로 2개씩 진출입 포인트 총 8개. 그 중 진입로는 번갈아가면서 등장하므로 건너뜀(2칸).
 
-		const int32 EndLeftPointIdx     = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx + 3);   // 좌회전 - 시계 방향으로 3칸 후.
-		const int32 EndStraightPointIdx = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 3);   // 직진 - 시계 방향으로 3칸 전.
-		const int32 EndRightPointIdx    = OmniMath::CircularNum(LanePoints.Num() - 1, PointIdx - 1);   // 우회전 - 시계 방향으로 1칸 전.
+		const int32 EndLeftPointIdx     = UtlMath::CircularNum(LanePoints.Num() - 1, PointIdx + 3);   // 좌회전 - 시계 방향으로 3칸 후.
+		const int32 EndStraightPointIdx = UtlMath::CircularNum(LanePoints.Num() - 1, PointIdx - 3);   // 직진 - 시계 방향으로 3칸 전.
+		const int32 EndRightPointIdx    = UtlMath::CircularNum(LanePoints.Num() - 1, PointIdx - 1);   // 우회전 - 시계 방향으로 1칸 전.
 		check(LanePoints.IsValidIndex(EndLeftPointIdx))
 		check(LanePoints.IsValidIndex(EndStraightPointIdx))
 		check(LanePoints.IsValidIndex(EndRightPointIdx))
@@ -139,7 +140,7 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 		for (int EndPointIdx = 0; EndPointIdx < EndPoints.Num(); ++EndPointIdx)
 		{
 			USplineComponent* const LaneSpline = GetLaneSpline(LaneIdx + EndPointIdx);
-			if (OB_IS_VALID(LaneSpline) == false)
+			if (UT_IS_VALID(LaneSpline) == false)
 				continue;
 
 			// 탄젠트를 상대 위치 취급.
@@ -179,7 +180,7 @@ void AOmniRoadIntersectionFlat4Way::SetLanePoints()
 int32 AOmniRoadIntersectionFlat4Way::CalculateLaneIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
 {
 	const int32 LaneMaxIdx = LaneSplineNum / 4; // 12/4 = 3, 0~3
-	const int32 LaneIdx    = OmniMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
+	const int32 LaneIdx    = UtlMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
 	return LaneIdx;
 }
 
@@ -200,21 +201,21 @@ USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const ERoa
 
 double AOmniRoadIntersectionFlat4Way::GetRoadWidth()
 {
-	if (OB_IS_VALID(Flat4WayMesh) == false || OB_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
+	if (UT_IS_VALID(Flat4WayMesh) == false || UT_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return 10.0; // 오류 방지 기본 값.
 
-	if (OB_IS_VALID(PlacedMesh) == false)
+	if (UT_IS_VALID(PlacedMesh) == false)
 		PlacedMesh = Flat4WayMesh->GetStaticMesh();
 
 	const FBox PlaceMeshBox = PlacedMesh->GetBoundingBox();
-	return OmniMath::GetBoxWidth(PlaceMeshBox);
+	return UtlMath::GetBoxWidth(PlaceMeshBox);
 }
 
 FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensionInfo()
 {
 	FIntersectionDimensionInfo Result = FIntersectionDimensionInfo();
 
-	if (OB_IS_VALID(Flat4WayMesh) == false || OB_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
+	if (UT_IS_VALID(Flat4WayMesh) == false || UT_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return Result;
 
 	const double RoadWidth = GetRoadWidth();
@@ -237,7 +238,7 @@ AOmniRoad* AOmniRoadIntersectionFlat4Way::GetNextRoadByLaneIdx(const int32 InLan
 int32 AOmniRoadIntersectionFlat4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	// 같은 경우, 잘못된 입력.
-	if ((InPrevRoad != InNextTargetRoad) && OB_IS_VALID(InPrevRoad) && IsValid(InNextTargetRoad))
+	if ((InPrevRoad != InNextTargetRoad) && UT_IS_VALID(InPrevRoad) && IsValid(InNextTargetRoad))
 	{
 		const int PrevRoadIdx = FindConnectedRoadIdx(InPrevRoad);
 		const int NextRoadIdx = FindConnectedRoadIdx(InNextTargetRoad);
@@ -253,12 +254,12 @@ int32 AOmniRoadIntersectionFlat4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad
 
 void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const int32 InAccessIdx)
 {
-	if (OB_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
+	if (UT_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
 	{
 		if (ConnectedRoadsArray.IsValidIndex(InAccessIdx))
 			ConnectedRoadsArray[InAccessIdx] = InRoad;
 		else
-			OB_LOG("InAccessIdx : invalid value")
+			UT_LOG("InAccessIdx : invalid value")
 	}
 }
 
@@ -267,7 +268,7 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	check(ConnectedRoadsArray.IsValidIndex(TargetRoadIdx))
 
 	ERoadDirection Direction      = ERoadDirection::Straight;
-	const uint32 DirectionNumeric = OmniMath::CircularNum(EnumToInt(ERoadDirection::Size), (TargetRoadIdx - StartLaneApproachIdx) - 1);
+	const uint32 DirectionNumeric = UtlMath::CircularNum(EnumToInt(ERoadDirection::Size), (TargetRoadIdx - StartLaneApproachIdx) - 1);
 
 	switch (DirectionNumeric)
 	{

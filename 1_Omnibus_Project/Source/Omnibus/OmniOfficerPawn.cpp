@@ -2,15 +2,16 @@
 
 #include "OmniOfficerPawn.h"
 
-#include "Omnibus.h"
 #include "OmnibusGameInstance.h"
 #include "OmnibusInputConfig.h"
 #include "OmnibusPlayerController.h"
 #include "OmnibusRoadManager.h"
-#include "OmnibusUtilities.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpectatorPawnMovement.h"
 #include "GameFramework/SpringArmComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 AOmniOfficerPawn::AOmniOfficerPawn()
 {
@@ -99,7 +100,7 @@ void AOmniOfficerPawn::InitSettings()
 	PlayerCamera->OrthoWidth = GetDesiredOrthoWidth();
 
 	// Passenger 렌더링 기준 단계 계산
-	OB_LIGHT_CHECK(PassengerVisibilityMaxStep < OrthoWidths.size() - 1, "PassengerVisibilityMaxStep is too big. Step must be less than %llu.", (OrthoWidths.size() - 1))
+	UT_LIGHT_CHECK(PassengerVisibilityMaxStep < OrthoWidths.size() - 1, "PassengerVisibilityMaxStep is too big. Step must be less than %llu.", (OrthoWidths.size() - 1))
 
 	PassengerVisibilityMaxStep    = FMath::Clamp(PassengerVisibilityMaxStep, 0, OrthoWidths.size() - 2);
 	PassengerVisibilityOrthoWidth = (OrthoWidths[PassengerVisibilityMaxStep + 1] + OrthoWidths[PassengerVisibilityMaxStep]) / 2;
@@ -151,7 +152,7 @@ void AOmniOfficerPawn::MoveCameraInput(const FInputActionValue& InputValue)
 	MovementComponent->Acceleration = Acceleration * WidthRatio;
 	MovementComponent->Deceleration = Deceleration * WidthRatio;
 
-	if (OB_IS_VALID(Controller))
+	if (UT_IS_VALID(Controller))
 	{
 		AddMovementInput(GetActorRightVector(), InputVector.Y);
 		AddMovementInput(GetActorForwardVector(), InputVector.X);
@@ -170,7 +171,7 @@ void AOmniOfficerPawn::DragMap(const FVector2D& InMousePosition)
 	if (bDragActive)
 	{
 		FVector2D ViewportSize;
-		if (OB_IS_VALID(GetWorld()) && OB_IS_VALID(GetWorld()->GetGameViewport()))
+		if (UT_IS_VALID(GetWorld()) && UT_IS_VALID(GetWorld()->GetGameViewport()))
 			GetWorld()->GetGameViewport()->GetViewportSize(ViewportSize);
 
 		// 화면이 커서를 따라가도록, 이동 속도 조절.
@@ -187,7 +188,7 @@ void AOmniOfficerPawn::DragMap(const FVector2D& InMousePosition)
 void AOmniOfficerPawn::ZoomCameraAtCursor(const FInputActionValue& InputValue)
 {
 	const float Axis = InputValue.Get<float>();
-	if (OB_IS_VALID(Controller))
+	if (UT_IS_VALID(Controller))
 	{
 		//상하 제한에 걸리면 줌 실행안함.
 		if (AddZoomStepByAxis(Axis))
@@ -198,7 +199,7 @@ void AOmniOfficerPawn::ZoomCameraAtCursor(const FInputActionValue& InputValue)
 			//마우스 휠업다운인 경우 커서 중심으로 줌하기 위해 커서 위치 저장.
 			FHitResult Result;
 			GetController<AOmnibusPlayerController>()->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), false, Result);
-			PrevScrollUnderCursorLocation = OmniMath::MakeFVector2D(Result.Location);
+			PrevScrollUnderCursorLocation = UtlMath::MakeFVector2D(Result.Location);
 		}
 	}
 }
@@ -206,7 +207,7 @@ void AOmniOfficerPawn::ZoomCameraAtCursor(const FInputActionValue& InputValue)
 void AOmniOfficerPawn::ZoomCameraCenter(const FInputActionValue& InputValue)
 {
 	const float Axis = InputValue.Get<float>();
-	if (OB_IS_VALID(Controller))
+	if (UT_IS_VALID(Controller))
 	{
 		//상하 제한에 걸리면 줌 실행안함.
 		if (AddZoomStepByAxis(Axis))
@@ -229,11 +230,11 @@ void AOmniOfficerPawn::UpdateCameraZoom(const float DeltaTime)
 		if (bUsingMouseWheelCameraZoom)
 		{
 			//마우스 커서가 가리키는 위치 고정
-			const FVector2D ActorLocation2D = OmniMath::MakeFVector2D(GetActorLocation());
+			const FVector2D ActorLocation2D = UtlMath::MakeFVector2D(GetActorLocation());
 			const float ScreenRatio         = PlayerCamera->OrthoWidth / PrevOrthoWidth;
 			const FVector2D LerpActorLoc2D  = FMath::Lerp(PrevScrollUnderCursorLocation, ActorLocation2D, ScreenRatio);
 
-			SetDefaultPawnLocation(OmniMath::MakeFVector(LerpActorLoc2D));
+			SetDefaultPawnLocation(UtlMath::MakeFVector(LerpActorLoc2D));
 		}
 
 		if (FMath::IsNearlyEqual(PlayerCamera->OrthoWidth, DesiredOrthoWidth, 1.e-3f))

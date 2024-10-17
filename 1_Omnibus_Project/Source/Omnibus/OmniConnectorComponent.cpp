@@ -3,9 +3,11 @@
 
 #include "OmniConnectorComponent.h"
 
-#include "OmnibusUtilities.h"
 #include "OmniRoad.h"
 #include "Components/SplineComponent.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 UOmniConnectorComponent::UOmniConnectorComponent()
 {
@@ -36,8 +38,8 @@ void UOmniConnectorComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 void UOmniConnectorComponent::SetOwnerOmniRoadAndSpline(AOmniRoad* InOwnerOmniRoad, USplineComponent* InOwnerSpline, const ERoadConnectorPoint InSplinePointPosition, const int32 InAccessPointIdx)
 {
-	OwnerOmniRoad       = OB_IS_VALID(InOwnerOmniRoad) ? InOwnerOmniRoad : nullptr;
-	OwnerSpline         = OB_IS_VALID(InOwnerSpline) ? InOwnerSpline : nullptr;
+	OwnerOmniRoad       = UT_IS_VALID(InOwnerOmniRoad) ? InOwnerOmniRoad : nullptr;
+	OwnerSpline         = UT_IS_VALID(InOwnerSpline) ? InOwnerSpline : nullptr;
 	SplinePointPosition = InSplinePointPosition;
 	AccessPointIdx      = InAccessPointIdx;
 }
@@ -82,7 +84,7 @@ void UOmniConnectorComponent::SetRelativeTransformToSpline()
 
 FVector UOmniConnectorComponent::GetSplinePointInsideTangent() const
 {
-	if (OB_IS_WEAK_PTR_VALID(OwnerSpline) == false)
+	if (UT_IS_WEAK_PTR_VALID(OwnerSpline) == false)
 		return FVector::ZeroVector;
 
 	constexpr ESplineCoordinateSpace::Type TangentSplineCoord = ESplineCoordinateSpace::World;
@@ -109,7 +111,7 @@ FVector UOmniConnectorComponent::GetSplinePointInsideTangentNormal() const
 
 void UOmniConnectorComponent::ChangeSplineTangentNormal(const UOmniConnectorComponent* InTarget) const
 {
-	if (OB_IS_WEAK_PTR_VALID(OwnerSpline) == false)
+	if (UT_IS_WEAK_PTR_VALID(OwnerSpline) == false)
 		return;
 
 	if(InTarget->GetOwnerOmniRoad() == GetOwnerOmniRoad())

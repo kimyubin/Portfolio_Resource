@@ -6,5 +6,3 @@
 IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, Omnibus, "Omnibus");
 
 DEFINE_LOG_CATEGORY(Omnibus);
-
-int FOBCheck::Number = 0;

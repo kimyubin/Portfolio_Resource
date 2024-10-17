@@ -2,19 +2,21 @@
 
 #include "OmnibusRoadManager.h"
 
+#include "OmniAsync.h"
 #include "OmnibusGameInstance.h"
+#include "OmnibusLevelManager.h"
 #include "OmnibusPlayData.h"
-#include "OmnibusUtilities.h"
 #include "OmniCityBlock.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
+#include "OmniPlayMainUI.h"
 #include "OmniRoadDefaultTwoLane.h"
 #include "OmniStationBusStop.h"
 #include "PathVisualizator.h"
 #include "Kismet/GameplayStatics.h"
-#include "OmniAsync.h"
-#include "OmnibusLevelManager.h"
-#include "OmniPlayMainUI.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 
 AOmnibusRoadManager::AOmnibusRoadManager()
@@ -115,27 +117,27 @@ std::tuple<FSectorInfo, TArray<FSectorInfo>> AOmnibusRoadManager::GetHomeAndDest
 {
 	FSectorInfo HomeInfo;
 	TArray<FSectorInfo> DestInfoList;
-	OB_IF(OmniCityBlockList.Num() <= 2)
+	UT_IF(OmniCityBlockList.Num() <= 2)
 		return std::make_tuple(HomeInfo, DestInfoList);
 
 	// 출발지
-	const int32 HomeBlockIdx        = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+	const int32 HomeBlockIdx        = UtlMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
 	AOmniCityBlock* const HomeBlock = OmniCityBlockList[HomeBlockIdx].Get();
-	const int32 HomeSectorIdx       = OmniMath::GetIntRandom(0, HomeBlock->GetSectorNum() - 1);
+	const int32 HomeSectorIdx       = UtlMath::GetIntRandom(0, HomeBlock->GetSectorNum() - 1);
 
 	constexpr int LoopMax = 1000;
 
 	// 도착지
-	int32 DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+	int32 DestBlockIdx = UtlMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
 	for (int LoopCount = 0; LoopCount < LoopMax; ++LoopCount)
 	{
 		if (HomeBlockIdx != DestBlockIdx)
 			break;
-		DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+		DestBlockIdx = UtlMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
 	}
 
 	AOmniCityBlock* DestBlock = OmniCityBlockList[DestBlockIdx].Get();
-	int32 DestSectorIdx       = OmniMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
+	int32 DestSectorIdx       = UtlMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
 	
 	// 이웃 블록인 경우, 섹터가 이웃하지 않게 조정.
 	if (HomeBlock->IsNeighborBlock(DestBlock))
@@ -148,7 +150,7 @@ std::tuple<FSectorInfo, TArray<FSectorInfo>> AOmnibusRoadManager::GetHomeAndDest
 				bNeighborSector = false;
 				break;
 			}
-			DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+			DestBlockIdx = UtlMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
 		}
 
 		// 이웃하지 않은 섹터를 찾지 못한 경우, 이웃하지 않은 블록과 섹터 선택
@@ -159,9 +161,9 @@ std::tuple<FSectorInfo, TArray<FSectorInfo>> AOmnibusRoadManager::GetHomeAndDest
 				DestBlock = OmniCityBlockList[DestBlockIdx].Get();
 				if (HomeBlock->IsNeighborBlock(DestBlock) == false)
 					break;
-				DestBlockIdx = OmniMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
+				DestBlockIdx = UtlMath::GetIntRandom(0, OmniCityBlockList.Num() - 1);
 			}
-			DestSectorIdx = OmniMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
+			DestSectorIdx = UtlMath::GetIntRandom(0, DestBlock->GetSectorNum() - 1);
 		}
 	}
 
@@ -220,7 +222,7 @@ AOmniPassenger* AOmnibusRoadManager::PopPassengerInPool()
 	TWeakObjectPtr<AOmniPassenger> FrontPassengerWeak;
 	PassengerPool->Dequeue(FrontPassengerWeak);
 	AOmniPassenger* Passenger = FrontPassengerWeak.Get();
-	OB_IF(Passenger == nullptr)
+	UT_IF(Passenger == nullptr)
 		return nullptr;
 
 	Passenger->EnablePassenger();
@@ -438,7 +440,7 @@ void AOmnibusRoadManager::CollectPassenger()
 
 void AOmnibusRoadManager::AddOmniRoad(AOmniRoad* InRoad)
 {
-	if (OB_IS_VALID(InRoad) == false)
+	if (UT_IS_VALID(InRoad) == false)
 		return;
 
 	TWeakObjectPtr<AOmniRoad>& RoadMapValue = OmniRoadsTMap.FindOrAdd(InRoad->GetOmniID());
@@ -452,7 +454,7 @@ void AOmnibusRoadManager::RemoveOmniRoadByID(const uint64 InId)
 
 void AOmnibusRoadManager::RemoveOmniRoad(AOmniRoad* InRoad)
 {
-	if (OB_IS_VALID(InRoad) == false)
+	if (UT_IS_VALID(InRoad) == false)
 		return;
 
 	RemoveOmniRoadByID(InRoad->GetOmniID());
@@ -467,7 +469,7 @@ AOmniRoad* AOmnibusRoadManager::FindOmniRoad(const uint64 InId)
 
 void AOmnibusRoadManager::AddStation(AOmniStationBusStop* InStation)
 {
-	if (OB_IS_VALID(InStation) == false)
+	if (UT_IS_VALID(InStation) == false)
 		return;
 
 	TWeakObjectPtr<AOmniStationBusStop>& StationMapValue = OmniStationTMap.FindOrAdd(InStation->GetOmniID());
@@ -481,7 +483,7 @@ void AOmnibusRoadManager::RemoveStationByID(const uint64 InId)
 
 void AOmnibusRoadManager::RemoveStation(AOmniStationBusStop* InStation)
 {
-	if (OB_IS_VALID(InStation) == false)
+	if (UT_IS_VALID(InStation) == false)
 		return;
 
 	RemoveStationByID(InStation->GetOmniID());
@@ -496,7 +498,7 @@ AOmniStationBusStop* AOmnibusRoadManager::FindStation(const uint64 InId)
 
 void AOmnibusRoadManager::AddCityBlock(AOmniCityBlock* InCityBlock)
 {
-	if (OB_IS_VALID(InCityBlock) == false)
+	if (UT_IS_VALID(InCityBlock) == false)
 		return;
 
 	OmniCityBlockList.Emplace(InCityBlock);
@@ -504,7 +506,7 @@ void AOmnibusRoadManager::AddCityBlock(AOmniCityBlock* InCityBlock)
 
 void AOmnibusRoadManager::RemoveCityBlockByID(const uint64 InId)
 {
-	OmniContainer::RemoveSwapByPredicate(OmniCityBlockList, [InId](const TWeakObjectPtr<AOmniCityBlock>& InCityBlockWeak)
+	UtlContainer::RemoveSwapByPredicate(OmniCityBlockList, [InId](const TWeakObjectPtr<AOmniCityBlock>& InCityBlockWeak)
 	{
 		AOmniCityBlock* CityBlock = InCityBlockWeak.Get();
 		return CityBlock ? CityBlock->GetOmniID() == InId : false;
@@ -513,7 +515,7 @@ void AOmnibusRoadManager::RemoveCityBlockByID(const uint64 InId)
 
 void AOmnibusRoadManager::RemoveCityBlock(AOmniCityBlock* InCityBlock)
 {
-	if (OB_IS_VALID(InCityBlock) == false)
+	if (UT_IS_VALID(InCityBlock) == false)
 		return;
 
 	RemoveCityBlockByID(InCityBlock->GetOmniID());
@@ -532,7 +534,7 @@ AOmniCityBlock* AOmnibusRoadManager::FindCityBlock(const uint64 InId)
 
 void AOmnibusRoadManager::AddOmniRoute(AOmniLineBusRoute* InOmniRoute)
 {
-	if (OB_IS_VALID(InOmniRoute) == false)
+	if (UT_IS_VALID(InOmniRoute) == false)
 		return;
 
 	TWeakObjectPtr<AOmniLineBusRoute>& RouteMapValue = OmniRouteTMap.FindOrAdd(InOmniRoute->GetOmniID());
@@ -546,7 +548,7 @@ void AOmnibusRoadManager::RemoveOmniRouteByID(const uint64 InId)
 
 void AOmnibusRoadManager::RemoveOmniRoute(AOmniLineBusRoute* InOmniRoute)
 {
-	if (OB_IS_VALID(InOmniRoute) == false)
+	if (UT_IS_VALID(InOmniRoute) == false)
 		return;
 
 	RemoveOmniRouteByID(InOmniRoute->GetOmniID());
@@ -561,7 +563,7 @@ AOmniLineBusRoute* AOmnibusRoadManager::FindOmniRoute(const uint64 InId)
 
 void AOmnibusRoadManager::AddPassenger(AOmniPassenger* InPassenger)
 {
-	if (OB_IS_VALID(InPassenger) == false)
+	if (UT_IS_VALID(InPassenger) == false)
 		return;
 
 	TWeakObjectPtr<AOmniPassenger>& PassengerMapValue = OmniPassengerTMap.FindOrAdd(InPassenger->GetOmniID());
@@ -577,7 +579,7 @@ void AOmnibusRoadManager::RemovePassengerByID(const uint64 InId)
 
 void AOmnibusRoadManager::RemovePassenger(AOmniLineBusRoute* InPassenger)
 {
-	if (OB_IS_VALID(InPassenger) == false)
+	if (UT_IS_VALID(InPassenger) == false)
 		return;
 
 	RemovePassengerByID(InPassenger->GetOmniID());

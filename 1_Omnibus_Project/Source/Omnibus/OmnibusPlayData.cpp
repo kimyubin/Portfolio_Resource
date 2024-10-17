@@ -2,11 +2,12 @@
 
 #include "OmnibusPlayData.h"
 
-#include "OmnibusUtilities.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
 #include "OmniVehicleBus.h"
 #include "PathVisualizator.h"
+
+#include "UTLStatics.h"
 
 UOmnibusPlayData::UOmnibusPlayData()
 {
@@ -32,14 +33,15 @@ UOmnibusPlayData::UOmnibusPlayData()
 	TransferRuleList = {FTransferRule(200.0f), FTransferRule(300.0f), FTransferRule(400.0f), FTransferRule(500.0f)};
 }
 
-void UOmnibusPlayData::Initialize()
+void UOmnibusPlayData::Initialize(UOmnibusGameInstance* InOmniGameInstance)
 {
+	Super::Initialize(InOmniGameInstance);
 	ReadCarSpecSheet();
 }
 
 UStaticMesh* UOmnibusPlayData::GetPlainRoadMesh(const int& InMeshIdx) const
 {
-	if (RoadMeshSets.IsValidIndex(InMeshIdx) && OB_IS_VALID(RoadMeshSets[InMeshIdx].PlainRoadMesh))
+	if (RoadMeshSets.IsValidIndex(InMeshIdx) && UT_IS_VALID(RoadMeshSets[InMeshIdx].PlainRoadMesh))
 		return RoadMeshSets[InMeshIdx].PlainRoadMesh;
 
 	return nullptr;
@@ -47,7 +49,7 @@ UStaticMesh* UOmnibusPlayData::GetPlainRoadMesh(const int& InMeshIdx) const
 
 UStaticMesh* UOmnibusPlayData::GetIntersectionFlat4WayRoadMesh(const int& InMeshIdx) const
 {
-	if (RoadMeshSets.IsValidIndex(InMeshIdx) && OB_IS_VALID(RoadMeshSets[InMeshIdx].IntersectionFlat4WayRoadMesh))
+	if (RoadMeshSets.IsValidIndex(InMeshIdx) && UT_IS_VALID(RoadMeshSets[InMeshIdx].IntersectionFlat4WayRoadMesh))
 		return RoadMeshSets[InMeshIdx].IntersectionFlat4WayRoadMesh;
 
 	return nullptr;
@@ -63,7 +65,7 @@ UTexture2D* UOmnibusPlayData::GetCityBlockIcon(const ECityBlockType InCityBlockT
 
 void UOmnibusPlayData::ReadCarSpecSheet()
 {
-	if (OB_IS_VALID(CarSpecDataTable))
+	if (UT_IS_VALID(CarSpecDataTable))
 	{
 		CarSpecList.Reset();
 

@@ -3,10 +3,8 @@
 #include "OmniVehicleBus.h"
 
 #include "OmniAICtrlBus.h"
-#include "Omnibus.h"
 #include "OmnibusPlayData.h"
 #include "OmnibusTypes.h"
-#include "OmnibusUtilities.h"
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
 #include "OmniStationBusStop.h"
@@ -16,6 +14,9 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/SpectatorPawnMovement.h"
 #include "Kismet/KismetMathLibrary.h"
+
+#include "UtlLog.h"
+#include "UTLStatics.h"
 
 AOmniVehicleBus::AOmniVehicleBus()
 {
@@ -75,9 +76,9 @@ void AOmniVehicleBus::BeginPlay()
 	Super::BeginPlay();
 
 	// 버스 노선없이 스폰된 경우, 로그 남기고 파괴
-	if (OB_IS_WEAK_PTR_VALID(OwnerBusRoute) == false || ThisStopIndex == INDEX_NONE)
+	if (UT_IS_WEAK_PTR_VALID(OwnerBusRoute) == false || ThisStopIndex == INDEX_NONE)
 	{
-		OB_LOG("This Bus was spawned alone without an 'OwnerBusRoute'.")
+		UT_LOG("This Bus was spawned alone without an 'OwnerBusRoute'.")
 		Destroy();
 		return;
 	}
@@ -103,10 +104,10 @@ void AOmniVehicleBus::SetupSpawnInit(AOmniLineBusRoute* InOwnerRoute, const ECar
 {
 	OwnerBusRoute        = InOwnerRoute;
 	ThisStopIndex        = InOwnerRoute->FindThisStopIdxByDist(InSpawnRouteDist);
-	CurrentRouteDistance = OmniMath::CircularNumF(InOwnerRoute->GetRouteSpline()->GetSplineLength(), InSpawnRouteDist + SteeringDistance); // 약간 더 전방을 바라봄.
+	CurrentRouteDistance = UtlMath::CircularNumF(InOwnerRoute->GetRouteSpline()->GetSplineLength(), InSpawnRouteDist + SteeringDistance); // 약간 더 전방을 바라봄.
 
 	CarSpec = GetOmnibusPlayData()->GetCarSpecList(InSpawnCarType);
-	OB_IF(CarSpec.CarType != InSpawnCarType)
+	UT_IF(CarSpec.CarType != InSpawnCarType)
 	{
 		Destroy();
 	}
@@ -275,7 +276,7 @@ void AOmniVehicleBus::DriveOnBusLine(const float DeltaTime)
 		constexpr float DecelerationFactor = 1.5f;
 
 		CurrentRouteDistance = FMath::FInterpTo(CurrentRouteDistance, ThisStopDist, DeltaTime, DecelerationFactor);
-		CurrentRouteDistance = OmniMath::CircularNumF(GetOwnerRouteLength(), CurrentRouteDistance);
+		CurrentRouteDistance = UtlMath::CircularNumF(GetOwnerRouteLength(), CurrentRouteDistance);
 	}
 	else
 	{
@@ -315,7 +316,7 @@ void AOmniVehicleBus::UpdateCurrentRouteDist(const float DeltaTime)
 		// 1. thisStop이 시작 정류장이고,
 		// 2. 현재 Dist가 thisStop보다 값이 큼 ( 현재 위치가 0.0 이전 )
 		// 3. 0.0 이전에서 감속 구간이 시작됨
-		if (DecelDist < 0.0f && CurrentRouteDistance >= OmniMath::CircularNumF(SplineLen, DecelDist))
+		if (DecelDist < 0.0f && CurrentRouteDistance >= UtlMath::CircularNumF(SplineLen, DecelDist))
 		{
 			// SimpleTextRender(GetActorLocation(), 10.f, "0", 200);
 			bEnterDecelArea = true;
@@ -332,8 +333,8 @@ void AOmniVehicleBus::UpdateCurrentRouteDist(const float DeltaTime)
 	// 코너에서 감속. 90도(PI/2.0 rad)에서 최대 감속
 	const float PrevDist           = CurrentRouteDistance;
 	const float HalfSteeringDist   = SteeringDistance / 2.0f;
-	const FVector PrevTangent      = SplineComp->GetTangentAtDistanceAlongSpline(OmniMath::CircularNumF(SplineLen, PrevDist - HalfSteeringDist), CoordSpace);
-	const FVector NextTangent      = SplineComp->GetTangentAtDistanceAlongSpline(OmniMath::CircularNumF(SplineLen, PrevDist + HalfSteeringDist), CoordSpace);
+	const FVector PrevTangent      = SplineComp->GetTangentAtDistanceAlongSpline(UtlMath::CircularNumF(SplineLen, PrevDist - HalfSteeringDist), CoordSpace);
+	const FVector NextTangent      = SplineComp->GetTangentAtDistanceAlongSpline(UtlMath::CircularNumF(SplineLen, PrevDist + HalfSteeringDist), CoordSpace);
 	const float DeltaRadian        = abs(acosf(FVector::DotProduct(PrevTangent.GetSafeNormal(), NextTangent.GetSafeNormal())));
 	constexpr float FactorPartRate = 0.7f; // 감속 영향력 
 	const float ChangeRateFactor   = FMath::Clamp((1.0f - (DeltaRadian / UE_HALF_PI)) * FactorPartRate, 0.0f, FactorPartRate) + (1.0f - FactorPartRate);
@@ -341,7 +342,7 @@ void AOmniVehicleBus::UpdateCurrentRouteDist(const float DeltaTime)
 
 	NowRouteSpeed         = FMath::Clamp(NowRouteSpeed + (CarSpec.Acceleration * DeltaTime * ChangeRateFactor), 0.0f, CarSpec.MaxSpeed);
 	const float DeltaDist = NowRouteSpeed * DeltaTime;
-	const float NextDist  = OmniMath::CircularNumF(SplineLen, CurrentRouteDistance + DeltaDist);
+	const float NextDist  = UtlMath::CircularNumF(SplineLen, CurrentRouteDistance + DeltaDist);
 
 	CurrentRouteDistance = NextDist;
 }
@@ -358,7 +359,7 @@ FVector AOmniVehicleBus::GetCurrentRouteLocation() const
 FRotator AOmniVehicleBus::GetLookAtDeltaRotation(const FVector InTargetPos) const
 {
 	const FVector  ActLoc    = GetActorLocation();
-	const FRotator ActRot    = OmniMath::YawRotator(GetActorRotation());
+	const FRotator ActRot    = UtlMath::YawRotator(GetActorRotation());
 	const FRotator TargetRot = UKismetMathLibrary::FindLookAtRotation(ActLoc, InTargetPos);
 
 	FRotator DeltaRot = FRotator::ZeroRotator;
@@ -366,7 +367,7 @@ FRotator AOmniVehicleBus::GetLookAtDeltaRotation(const FVector InTargetPos) cons
 
 #if WITH_EDITOR
 	if (GetActorRotation().Pitch != 0.0 || GetActorRotation().Roll != 0.0)
-		OB_LOG("error bus rot - %s/%s : %s", *GetName(), *GetActorLabel(), *GetActorRotation().ToString())
+		UT_LOG("error bus rot - %s/%s : %s", *GetName(), *GetActorLabel(), *GetActorRotation().ToString())
 #endif
 
 	return DeltaRot;
@@ -414,6 +415,6 @@ FBusStopDistance AOmniVehicleBus::GetThisStopDist() const
 
 void AOmniVehicleBus::SetDriveMaxSpeed(const float InMaxSpeed /*= 1200.0*/)
 {
-	if (OB_IS_VALID(PawnMovement))
+	if (UT_IS_VALID(PawnMovement))
 		PawnMovement->MaxSpeed = InMaxSpeed;
 }
