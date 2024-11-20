@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "OmniRoadDefaultTwoLane.h"
+#include "OmniRoadTwoLane.h"
 
 #include "OmnibusTypes.h"
 #include "OmniConnectorComponent.h"
@@ -10,7 +10,7 @@
 #include "UtlLog.h"
 #include "UTLStatics.h"
 
-AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
+AOmniRoadTwoLane::AOmniRoadTwoLane()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -40,29 +40,29 @@ AOmniRoadDefaultTwoLane::AOmniRoadDefaultTwoLane()
 }
 
 #if WITH_EDITOR
-void AOmniRoadDefaultTwoLane::PostEditMove(bool bFinished)
+void AOmniRoadTwoLane::PostEditMove(bool bFinished)
 {
 	SnapRoadSplineTerminalLocation();
 	Super::PostEditMove(bFinished);
 }
 #endif // WITH_EDITOR
 
-void AOmniRoadDefaultTwoLane::BeginPlay()
+void AOmniRoadTwoLane::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-void AOmniRoadDefaultTwoLane::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void AOmniRoadTwoLane::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 }
 
-void AOmniRoadDefaultTwoLane::Tick(float DeltaTime)
+void AOmniRoadTwoLane::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
+void AOmniRoadTwoLane::DetectAllConnectedOmniRoad()
 {
 	// 현재 도로의 감지용 컴포넌트 순회. 감지된 대상 도로를 찾음.
 	for (UOmniConnectorComponent* const Connector : RoadConnectors)
@@ -81,7 +81,7 @@ void AOmniRoadDefaultTwoLane::DetectAllConnectedOmniRoad()
 	}
 }
 
-void AOmniRoadDefaultTwoLane::SnapRoadSplineTerminalLocation()
+void AOmniRoadTwoLane::SnapRoadSplineTerminalLocation()
 {
 	constexpr ESplineCoordinateSpace::Type CoordSpace = ESplineCoordinateSpace::Local;
 
@@ -97,7 +97,7 @@ void AOmniRoadDefaultTwoLane::SnapRoadSplineTerminalLocation()
 	}
 }
 
-void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
+void AOmniRoadTwoLane::MakeSplineMeshComponentAlongSpline()
 {
 	if (UT_IS_VALID(PlacedMesh) == false || UT_IS_VALID(GetMainRoadSpline()) == false)
 		return;
@@ -135,7 +135,7 @@ void AOmniRoadDefaultTwoLane::MakeSplineMeshComponentAlongSpline()
 	}
 }
 
-void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
+void AOmniRoadTwoLane::UpdateLaneSplinesAlongRoadCenter()
 {
 	if ( UT_IS_VALID(PlacedMesh) == false
 		|| UT_IS_VALID(GetMainRoadSpline()) == false
@@ -249,13 +249,13 @@ void AOmniRoadDefaultTwoLane::UpdateLaneSplinesAlongRoadCenter()
 	LaneSpline_1->UpdateSpline();
 }
 
-AOmniRoad* AOmniRoadDefaultTwoLane::GetNextRoadByLaneIdx(const int32 InLaneIdx)
+AOmniRoad* AOmniRoadTwoLane::GetNextRoadByLaneIdx(const int32 InLaneIdx)
 {
 	// 2차선은 이웃 도로의 Idx와 해당 도로로 가는 차선의 번호가 동일.
 	return GetConnectedRoad(InLaneIdx);
 }
 
-int32 AOmniRoadDefaultTwoLane::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+int32 AOmniRoadTwoLane::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	// 같은 경우, 잘못된 입력.
 	// 시작 지점의 경우, 이전 도로에 nullptr가 오기 때문에 체크 안함.
@@ -267,12 +267,12 @@ int32 AOmniRoadDefaultTwoLane::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmn
 	return INDEX_NONE;
 }
 
-USplineComponent* AOmniRoadDefaultTwoLane::GetMainRoadSpline() const
+USplineComponent* AOmniRoadTwoLane::GetMainRoadSpline() const
 {
 	return GetRoadSpline(0);
 }
 
-UStaticMesh* AOmniRoadDefaultTwoLane::GetRoadMesh(const float InLaneLength)
+UStaticMesh* AOmniRoadTwoLane::GetRoadMesh(const float InLaneLength)
 {
 	// 없는 경우 임시 조치
 	UT_IF(LaneMeshList.IsEmpty())

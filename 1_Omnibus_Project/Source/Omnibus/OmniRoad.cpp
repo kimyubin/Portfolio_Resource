@@ -427,9 +427,16 @@ UOmniConnectorComponent* AOmniRoad::DetectOmniRoad(UOmniConnectorComponent* Conn
 	return DetectedTargetConnector;
 }
 
-bool AOmniRoad::FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* InTargetClass, const FVector& InTargetPos, AOmniRoad*& OutNearRoad, int32& OutLaneIdx)
+bool AOmniRoad::CanInstallBusStop() const
 {
-	bool IsFind = false;
+	UT_LOG("omniRoad에서 로드됨")
+
+	return false;
+}
+
+bool AOmniRoad::FindNearestRoadAndLane(const TArray<AActor*>& InActors, const FVector& InTargetPos, AOmniRoad*& OutNearRoad, int32& OutLaneIdx)
+{
+	bool bIsFind = false;
 
 	double DistanceFromNearest = TNumericLimits<double>::Max();
 	for (AActor* InActor : InActors)
@@ -448,11 +455,11 @@ bool AOmniRoad::FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* 
 
 					OutNearRoad = Road;
 					OutLaneIdx  = idx;
-					IsFind      = true;
+					bIsFind     = true;
 				}
 			}
 		}
 	}
 
-	return IsFind;
+	return bIsFind;
 }

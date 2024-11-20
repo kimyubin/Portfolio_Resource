@@ -9,7 +9,7 @@
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
 #include "OmniRoad.h"
-#include "OmniRoadDefaultTwoLane.h"
+#include "OmniRoadTwoLane.h"
 #include "OmniVehicleBus.h"
 #include "Components/BoxComponent.h"
 #include "Components/SplineComponent.h"
@@ -101,14 +101,13 @@ void AOmniStationBusStop::SearchRoadAndBlock()
 void AOmniStationBusStop::SearchRoad()
 {
 	FOmniAsync::UpdateStopProxyAsync(this);
-	
-	UClass* TargetClass       = AOmniRoadDefaultTwoLane::StaticClass();
-	AOmniRoad* NearRoad       = nullptr;
-	OwnerLaneIndex            = 0;
-	const bool IsDetectedRoad = DetectRoadAndLane(TargetClass, NearRoad, OwnerLaneIndex);
+
+	AOmniRoad* NearRoad        = nullptr;
+	OwnerLaneIndex             = 0;
+	const bool bIsDetectedRoad = DetectRoadAndLane(NearRoad, OwnerLaneIndex);
 
 	// 감지 실패 시 연결 해제.
-	if (IsDetectedRoad == false || UT_IS_VALID(NearRoad) == false || NearRoad->IsA(TargetClass) == false)
+	if (bIsDetectedRoad == false || UT_IS_VALID(NearRoad) == false)
 	{
 		UnlinkOwnerOmniRoad();
 		return;
@@ -155,16 +154,22 @@ void AOmniStationBusStop::SearchCityBlock()
 	UpdateOwnerOmniCityBlock(NearCityBlock);
 }
 
-bool AOmniStationBusStop::DetectRoadAndLane(UClass* InClassFilter, AOmniRoad*& OutNearRoad, int32& OutNearLaneIdx) const
+bool AOmniStationBusStop::DetectRoadAndLane(AOmniRoad*& OutNearRoad, int32& OutNearLaneIdx) const
 {
 	TArray<AActor*> OverlappingActors;
-	const bool IsOverlap = FUtlStatics::GetOverlapActors(StationDetector, InClassFilter, OverlappingActors);
-
-	if (IsOverlap == false)
+	const bool bIsOverlap = FUtlStatics::GetOverlapActors(StationDetector, AOmniRoad::StaticClass(), OverlappingActors);
+	if (bIsOverlap == false)
 		return false;
 
+	// OmniRoad 아니면 제거
+	// 정류장 설치 불가면 제거
+	OverlappingActors.RemoveAllSwap([](const AActor* InActor)
+	{
+		const AOmniRoad* InRoad = Cast<AOmniRoad>(InActor);
+		return InRoad ? (InRoad->CanInstallBusStop() == false) : true;
+	});
+
 	return AOmniRoad::FindNearestRoadAndLane(OverlappingActors
-	                                       , InClassFilter
 	                                       , GetActorLocation()
 	                                       , OutNearRoad
 	                                       , OutNearLaneIdx);

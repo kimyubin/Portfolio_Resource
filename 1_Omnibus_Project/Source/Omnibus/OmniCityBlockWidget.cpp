@@ -29,6 +29,6 @@ void UOmniCityBlockWidget::UpdateTypeState(const ECityBlockType InNextType)
 {
 	UTexture2D* CityBlockIcon = GetGameInstance<UOmnibusGameInstance>()->GetOmnibusPlayData()->GetCityBlockIcon(InNextType);
 	TypeImg->SetBrushFromTexture(CityBlockIcon);
-	TypeDescription->SetText(FText::FromString(UtlStr::EnumToString(InNextType)));
+	TypeDescription->SetText(FText::FromString(UtlEnum::EnumToString(InNextType)));
 	
 }

@@ -144,15 +144,21 @@ protected:
 
 public:
 	/**
+	 * 버스 정류장을 설치할 수 있는 지 확인합니다.
+	 * 
+	 * @return 정류장을 설치할 수 있다면 true.
+	 */
+	virtual bool CanInstallBusStop() const;;
+
+	/**
 	 * 액터 배열에서 가장 가까운 차선과 해당 차선을 보유한 도로를 찾음
 	 * @param InActors      찾을 액터 배열
-	 * @param InTargetClass 찾는 도로의 UClass
 	 * @param InTargetPos   기준이 되는 위치. 이곳에서 가장 가까운 곳을 찾음
 	 * @param OutNearRoad   가장 가까운 도로. OutLaneIdx 차선을 보유함.
 	 * @param OutLaneIdx    가장 가까운 차선의 Index.
 	 * @return 목록에서 가까운 도로 찾기 성공시 true.
 	 */
-	static bool FindNearestRoadAndLane(const TArray<AActor*>& InActors, UClass* InTargetClass, const FVector& InTargetPos, AOmniRoad*& OutNearRoad, int32& OutLaneIdx);
+	static bool FindNearestRoadAndLane(const TArray<AActor*>& InActors, const FVector& InTargetPos, AOmniRoad*& OutNearRoad, int32& OutLaneIdx);
 
 protected:
 	/** 연결되어있는 도로 집합 */

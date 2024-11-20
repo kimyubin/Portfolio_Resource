@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OmniRoad.h"
-#include "OmniRoadIntersectionFlat4Way.generated.h"
+#include "OmniRoad4Way.generated.h"
 
 enum class ERoadApproach;
 enum class ERoadDirection : uint8;
@@ -14,12 +14,12 @@ struct FIntersectionDimensionInfo;
  * 회전용 차선 있는 버전.
  */
 UCLASS()
-class OMNIBUS_API AOmniRoadIntersectionFlat4Way : public AOmniRoad
+class OMNIBUS_API AOmniRoad4Way : public AOmniRoad
 {
 	GENERATED_BODY()
 
 public:
-	AOmniRoadIntersectionFlat4Way();
+	AOmniRoad4Way();
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
@@ -69,8 +69,9 @@ private:
 	 */
 	static std::tuple<int32, int32> GetConnectorPositionIdx(const int32 InConnectorIdx);
 	
-
 public:
+	virtual bool CanInstallBusStop() const override { return false; }
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UStaticMeshComponent* Flat4WayMesh;
 

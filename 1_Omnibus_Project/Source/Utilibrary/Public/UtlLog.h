@@ -15,6 +15,8 @@
 /** 호출 함수 이름 및 라인 단순 출력 */
 #define UT_LOG_FUNC() UE_LOG(UTL, Warning, TEXT("%s"), *UT_LOG_FUNC_LINE_INFO)
 
+/** 로그 경고 수준을 지정할 수 있는 로그입니다. */
+#define UT_VERB_LOG(Verbosity, Format, ...) UE_LOG(UTL, Verbosity, TEXT("%s %s"), *UT_LOG_FUNC_LINE_INFO, *FString::Printf(TEXT(Format), ##__VA_ARGS__))
 
 /**
  * 호출 함수 이름, 라인 출력. string을 받아서 로그 출력. 서식 지정자 써서 사용가능.<br>
@@ -35,11 +37,15 @@
 
 /** 스크린 출력 */
 #define UT_DEBUG_MSG(LifeTime, Format, ...)\
-UT_IF (GEngine != nullptr)\
+if (GEngine != nullptr)\
 {\
-    UT_LOG("%s", *OnlineSubsystemPtr->GetSubsystemName().ToString())\
     GEngine->AddOnScreenDebugMessage(INDEX_NONE, LifeTime, FColor::Red, FString::Printf(TEXT(Format), ##__VA_ARGS__), true, FVector2D::UnitVector);\
+}\
+else\
+{\
+	UT_LOG("GEngine is not valid")\
 }
+
 //GEngine->AddOnScreenDebugMessage(INDEX_NONE, 1.f, FColor::Red, FString::Printf(TEXT(Format), ##__VA_ARGS__), true, FVector2D::UnitVector * 0.75);
 
 // #define UT_DEBUG_MSG(Format, ...) GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT(Format), ##__VA_ARGS__), true, FVector2D::UnitVector * 0.75);

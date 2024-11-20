@@ -47,7 +47,7 @@ public:
 	void SearchCityBlock();
 
 	UFUNCTION(Category = PostEditMove)
-	bool DetectRoadAndLane(UClass* InClassFilter, AOmniRoad*& OutNearRoad, int32& OutNearLaneIdx) const;
+	bool DetectRoadAndLane(AOmniRoad*& OutNearRoad, int32& OutNearLaneIdx) const;
 
 	UFUNCTION(Category = PostEditMove)
 	bool DetectCityBlock(UClass* InClassFilter, AOmniCityBlock*& OutCityBlock) const;

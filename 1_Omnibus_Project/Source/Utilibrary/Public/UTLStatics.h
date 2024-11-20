@@ -80,7 +80,7 @@ FORCEINLINE bool IsUtlTWeakObjectValidLog(const TWeakObjectPtr<UObject> Test, co
 
 /** 조건문 로그. if문을 대체하고, 조건이 true인 경우 로그를 남깁니다.*/
 #define UT_IF(cond) \
-if ( IfTureLog( (cond), *UT_LOG_FUNC_LINE_INFO ) )
+if ( IfTureLog( (!!(cond)), *UT_LOG_FUNC_LINE_INFO ) )
 
 /** 참인 경우 로그를 남깁니다/ */
 inline bool IfTureLog(const bool InCheck, const FString& InLineInfo)
@@ -91,6 +91,18 @@ inline bool IfTureLog(const bool InCheck, const FString& InLineInfo)
 	}
 	
 	return InCheck;
+}
+
+/** 조건을 충족하지 않으면, 로그를 남기고, 게임을 종료합니다. */
+#define checkAndQuitGame(InCheck)\
+{\
+	if ((!!(InCheck)) == false)\
+	{\
+		const FString checkErrorMsg = "Error. Check failed. Quit Game.";\
+		UT_ERROR("체크 실패 게임을 종료합니다. %s", *checkErrorMsg)\
+		FMessageDialog::Debugf(FText::FromString(checkErrorMsg));\
+		UKismetSystemLibrary::QuitGame(GetWorld(), nullptr, EQuitPreference::Quit, true);\
+	}\
 }
 
 
@@ -252,13 +264,32 @@ namespace UtlStr
 	 */
 	UTILIBRARY_API FName ConcatStrInt(const FString& InNameString, const int32 InIdx);
 
-	/** 열거형을 문자열로 변환. */
+}
+
+/** 열거형 관련 유틸리티 */
+namespace UtlEnum
+{
+	/** 열거형을 문자열로 변환합니다. */
 	template <typename E>
 	FORCEINLINE FString EnumToString(const E InVal)
 	{
 		return magic_enum::enum_name(InVal).data();
 	}
+
+	/**
+	 * enum class 값을 베이스 타입 값으로 static casting합니다.
+	 * 
+	 * @tparam E enum class Only
+	 * @param e 변환 대상 enum
+	 * @return static_cast<uint8>(e). std::underlying_type_t<E>(e)
+	 */
+	template <typename E>
+	constexpr std::enable_if_t<std::is_enum_v<E>, std::underlying_type_t<E>> EnumToInt(E e) noexcept
+	{
+		return static_cast<std::underlying_type_t<E>>(e);
+	}
 }
+
 
 /** 비트연산 */
 namespace UtlBit
@@ -294,6 +325,19 @@ namespace UtlBit
 /** 수식 유틸리티 */
 namespace UtlMath
 {
+	/**
+	 * 입력된 값의 부호를 반환합니다.
+	 * 
+	 * @tparam T 산술 유형 가능 
+	 * @param InNumber 
+	 * @return 양수면 +1, 음수면 -1, 0이거나 그외 유효하지 않은 값은 0을 반환합니다.
+	 */
+	template <typename T>
+	std::enable_if_t<std::is_arithmetic_v<T>, T> GetSign(const T InNumber)
+	{
+		return (InNumber > 0) ? 1 : (InNumber < 0) ? -1 : 0;
+	}
+
 	/**
 	 * 입력된 숫자를 주어진 범위[0, Max] 내에서 순환시켜 반환.
 	 * 음수, 양수 양방향 변환
@@ -357,7 +401,7 @@ namespace UtlMath
 	 * 입력된 축을 기준으로 FRotator를 회전 후 반환.
 	 * @param InRotator 회전할 FRotator
 	 * @param InAngle 회전 각도.
-	 * @param InAxis 회전 축. 내부에서 정규화해서 처리
+	 * @param InAxis 회전 축.
 	 * @return 회전된 FRotator
 	 */
 	UTILIBRARY_API FRotator RotateAxis(const FRotator& InRotator, const double InAngle, const FVector& InAxis);

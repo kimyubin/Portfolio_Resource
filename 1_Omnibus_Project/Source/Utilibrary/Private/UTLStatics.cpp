@@ -289,9 +289,13 @@ FRotator UtlMath::YawRotator(const FRotator& InRotator)
 
 FRotator UtlMath::RotateAxis(const FRotator& InRotator, const double InAngle, const FVector& InAxis)
 {
-	//입력 축을 기준으로 입력 각도만큼 회전한 쿼터니언을 구함.	
-	const FQuat InQuat = FQuat(InAxis.GetSafeNormal(), FMath::DegreesToRadians(InAngle));
-	return InRotator + FRotator(InQuat);
+	const FQuat DeltaQuat     = FQuat(InAxis, FMath::DegreesToRadians(InAngle));
+	const FQuat CurRelRotQuat = InRotator.Quaternion();
+
+	//입력 축을 기준으로 입력 각도만큼 회전한 쿼터니언
+	const FQuat NewRelRotQuat = CurRelRotQuat * DeltaQuat;
+
+	return NewRelRotQuat.Rotator();
 }
 
 FRotator UtlMath::RotateAxisX(const FRotator& InRotator, const double InAngle)

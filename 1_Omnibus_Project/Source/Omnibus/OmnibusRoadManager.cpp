@@ -10,7 +10,7 @@
 #include "OmniLineBusRoute.h"
 #include "OmniPassenger.h"
 #include "OmniPlayMainUI.h"
-#include "OmniRoadDefaultTwoLane.h"
+#include "OmniRoad.h"
 #include "OmniStationBusStop.h"
 #include "PathVisualizator.h"
 #include "Kismet/GameplayStatics.h"

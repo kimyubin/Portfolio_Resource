@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "OmniRoadIntersectionFlat4Way.h"
+#include "OmniRoad4Way.h"
 
 #include "OmnibusTypes.h"
 #include "OmniConnectorComponent.h"
@@ -10,7 +10,7 @@
 #include "UTLStatics.h"
 
 // Sets default values
-AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
+AOmniRoad4Way::AOmniRoad4Way()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -50,7 +50,7 @@ AOmniRoadIntersectionFlat4Way::AOmniRoadIntersectionFlat4Way()
 	TangentSizeRate = 2.0f;
 }
 
-void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
+void AOmniRoad4Way::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	if (UT_IS_VALID(PlacedMesh))
@@ -65,18 +65,18 @@ void AOmniRoadIntersectionFlat4Way::OnConstruction(const FTransform& Transform)
 }
 
 // Called when the game starts or when spawned
-void AOmniRoadIntersectionFlat4Way::BeginPlay()
+void AOmniRoad4Way::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
 // Called every frame
-void AOmniRoadIntersectionFlat4Way::Tick(float DeltaTime)
+void AOmniRoad4Way::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
+void AOmniRoad4Way::SetSplinesTransform()
 {
 	if (UT_IS_VALID(Flat4WayMesh) == false || UT_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return;
@@ -157,7 +157,7 @@ void AOmniRoadIntersectionFlat4Way::SetSplinesTransform()
 	}
 }
 
-void AOmniRoadIntersectionFlat4Way::SetLanePoints()
+void AOmniRoad4Way::SetLanePoints()
 {
 	const FIntersectionDimensionInfo DimensionInfo = GetIntersectionDimensionInfo();
 
@@ -177,29 +177,29 @@ void AOmniRoadIntersectionFlat4Way::SetLanePoints()
 				};
 }
 
-int32 AOmniRoadIntersectionFlat4Way::CalculateLaneIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
+int32 AOmniRoad4Way::CalculateLaneIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
 {
 	const int32 LaneMaxIdx = LaneSplineNum / 4; // 12/4 = 3, 0~3
 	const int32 LaneIdx    = UtlMath::CircularNum(LaneSplineNum - 1, ApproachIdx * LaneMaxIdx + LaneDirection);
 	return LaneIdx;
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
+USplineComponent* AOmniRoad4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const uint8 LaneDirection) const
 {
 	return GetLaneSpline(CalculateLaneIdx(ApproachIdx, LaneDirection));
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const ERoadDirection& LaneDirection) const
+USplineComponent* AOmniRoad4Way::GetLaneByApproachIdx(const int32 ApproachIdx, const ERoadDirection& LaneDirection) const
 {
 	return GetLaneByApproachIdx(ApproachIdx, EnumToInt(LaneDirection));
 }
 
-USplineComponent* AOmniRoadIntersectionFlat4Way::GetLaneByApproachIdx(const ERoadApproach& ApproachIdx, const ERoadDirection& LaneDirection) const
+USplineComponent* AOmniRoad4Way::GetLaneByApproachIdx(const ERoadApproach& ApproachIdx, const ERoadDirection& LaneDirection) const
 {
 	return GetLaneByApproachIdx(EnumToInt(ApproachIdx), EnumToInt(LaneDirection));
 }
 
-double AOmniRoadIntersectionFlat4Way::GetRoadWidth()
+double AOmniRoad4Way::GetRoadWidth()
 {
 	if (UT_IS_VALID(Flat4WayMesh) == false || UT_IS_VALID(Flat4WayMesh->GetStaticMesh()) == false)
 		return 10.0; // 오류 방지 기본 값.
@@ -211,7 +211,7 @@ double AOmniRoadIntersectionFlat4Way::GetRoadWidth()
 	return UtlMath::GetBoxWidth(PlaceMeshBox);
 }
 
-FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensionInfo()
+FIntersectionDimensionInfo AOmniRoad4Way::GetIntersectionDimensionInfo()
 {
 	FIntersectionDimensionInfo Result = FIntersectionDimensionInfo();
 
@@ -227,7 +227,7 @@ FIntersectionDimensionInfo AOmniRoadIntersectionFlat4Way::GetIntersectionDimensi
 	return Result;
 }
 
-AOmniRoad* AOmniRoadIntersectionFlat4Way::GetNextRoadByLaneIdx(const int32 InLaneIdx)
+AOmniRoad* AOmniRoad4Way::GetNextRoadByLaneIdx(const int32 InLaneIdx)
 {
 	// (진입도로 번호) 좌 직 우 // 진출 순서임.
 	// (0) 1 2 3 (1) 2 3 0 (2) 3 0 1 (3) 0 1 2
@@ -235,7 +235,7 @@ AOmniRoad* AOmniRoadIntersectionFlat4Way::GetNextRoadByLaneIdx(const int32 InLan
 	return GetConnectedRoad(LaneToRoad[InLaneIdx]);
 }
 
-int32 AOmniRoadIntersectionFlat4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
+int32 AOmniRoad4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad, AOmniRoad* InNextTargetRoad)
 {
 	// 같은 경우, 잘못된 입력.
 	if ((InPrevRoad != InNextTargetRoad) && UT_IS_VALID(InPrevRoad) && IsValid(InNextTargetRoad))
@@ -252,7 +252,7 @@ int32 AOmniRoadIntersectionFlat4Way::FindLaneIdxToNextRoad(AOmniRoad* InPrevRoad
 	return INDEX_NONE;
 }
 
-void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const int32 InAccessIdx)
+void AOmniRoad4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, const int32 InAccessIdx)
 {
 	if (UT_IS_VALID(InRoad) && (InRoad->GetOmniID() != GetOmniID()))
 	{
@@ -263,7 +263,7 @@ void AOmniRoadIntersectionFlat4Way::AddConnectedRoadSingle(AOmniRoad* InRoad, co
 	}
 }
 
-ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(const int32 StartLaneApproachIdx, const int32 TargetRoadIdx) const
+ERoadDirection AOmniRoad4Way::GetLaneDirectionByConnectedIdx(const int32 StartLaneApproachIdx, const int32 TargetRoadIdx) const
 {
 	check(ConnectedRoadsArray.IsValidIndex(TargetRoadIdx))
 
@@ -288,7 +288,7 @@ ERoadDirection AOmniRoadIntersectionFlat4Way::GetLaneDirectionByConnectedIdx(con
 	return Direction;
 }
 
-std::tuple<int32, int32> AOmniRoadIntersectionFlat4Way::GetConnectorPositionIdx(const int32 InConnectorIdx)
+std::tuple<int32, int32> AOmniRoad4Way::GetConnectorPositionIdx(const int32 InConnectorIdx)
 {
 	/**
      * RoadConnectors의 위치가 부모 RoadSpline의 양 끝에 위치함.
