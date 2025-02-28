@@ -1,0 +1,41 @@
+    // UV 좌표에 밀도 적용
+    float2 newUV = uv * Density;
+
+    // UV 좌표의 분수 부분 추출
+    float2 localUV = frac(newUV) * 2 - 1;
+    
+    // 로컬 중심에서의 거리 계산
+    float localDistanceFromCenter = length(localUV);
+    
+    // 해시 생성
+    uint2 tid = newUV;
+    uint seed = tid.x + 100 * tid.y + 100 * 10;
+
+    uint n = seed;
+    //n = (n << 13U) ^ n;
+    n = (n << 13U) ^ n;
+    n = n * (n * n * 15731U + 0x789221U) + 0x1376312589U;
+    float hash = float(n & uint(0x7fffffffU)) / float(0x7fffffff);
+    float rand = lerp(NoiseMin, NoiseMax, hash);
+
+    // 셸의 인덱스 및 셸 높이 계산
+    float shellIndex = ShellIndex;
+    float shellCount = ShellCount;
+    float h = shellIndex / shellCount;
+
+    // 두께 조건을 계산하고 쉘의 픽셀을 제거할지 여부 판단
+    int outsideThickness = (localDistanceFromCenter) > (Thickness * (rand - h));
+    if (outsideThickness && ShellIndex > 0) discard;
+
+    // 조명 및 반사 계산 (Valve's half Lambert 조명 모델 사용)
+    float ndotl = saturate(dot(normal, normalize(WorldLightPos))) * 0.5f + 0.5f;
+    ndotl = ndotl * ndotl;
+
+    // Ambient Occlusion 계산
+    float ambientOcclusion = pow(h, Attenuation);
+    ambientOcclusion += OcclusionBias;
+    ambientOcclusion = saturate(ambientOcclusion);
+
+    // 셸의 색상 계산
+    return float4(ShellColor * ndotl * ambientOcclusion, 1.0);
+

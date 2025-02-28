@@ -1,0 +1,11 @@
+---,ItemDefID,ItemSignatureName,ItemActorClass,Thumbnail,ItemTags
+0,"0","Cam","/Game/FieldItems/BP_FieldItem_Cam.BP_FieldItem_Cam_C","/Game/TestAssets/barrel_large_Texture.barrel_large_Texture","(GameplayTags=((TagName=""Item.Architecture""),(TagName=""Item.Furniture"")))"
+1,"1","barrel_large","/Game/FieldItems/BP_FieldItem_barrel_large.BP_FieldItem_barrel_large_C","/Game/TestAssets/barrel_large_Texture.barrel_large_Texture","(GameplayTags=)"
+2,"2","ceiling_tile","/Game/FieldItems/BP_FieldItem_ceiling_tile.BP_FieldItem_ceiling_tile_C","/Game/TestAssets/ceiling_tile_Texture.ceiling_tile_Texture","(GameplayTags=)"
+3,"3","chest","/Game/FieldItems/BP_FieldItem_chest.BP_FieldItem_chest_C","/Game/TestAssets/chest_Texture.chest_Texture","(GameplayTags=)"
+4,"4","floor_foundation_allsides","/Game/FieldItems/BP_FieldItem_floor_foundation_allsides.BP_FieldItem_floor_foundation_allsides_C","/Game/TestAssets/floor_foundation_allsides_Texture.floor_foundation_allsides_Texture","(GameplayTags=)"
+5,"5","keg","/Game/FieldItems/BP_FieldItem_keg.BP_FieldItem_keg_C","/Game/TestAssets/keg_Texture.keg_Texture","(GameplayTags=)"
+6,"6","table_long","/Game/FieldItems/BP_FieldItem_table_long.BP_FieldItem_table_long_C","/Game/TestAssets/table_long_Texture.table_long_Texture","(GameplayTags=)"
+7,"7","table_long_tablecloth","/Game/FieldItems/BP_FieldItem_table_long_tablecloth.BP_FieldItem_table_long_tablecloth_C","/Game/TestAssets/table_long_tablecloth_Texture.table_long_tablecloth_Texture","(GameplayTags=)"
+8,"8","wall_corner_small","/Game/FieldItems/BP_FieldItem_wall_corner_small.BP_FieldItem_wall_corner_small_C","/Game/TestAssets/wall_corner_small_Texture.wall_corner_small_Texture","(GameplayTags=)"
+9,"9","wall_cracked","/Game/FieldItems/BP_FieldItem_wall_cracked.BP_FieldItem_wall_cracked_C","/Game/TestAssets/wall_cracked_Texture.wall_cracked_Texture","(GameplayTags=)"
