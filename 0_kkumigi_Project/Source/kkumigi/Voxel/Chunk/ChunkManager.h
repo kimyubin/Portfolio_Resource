@@ -51,9 +51,10 @@ public:
 
 	bool IsUseSmoothingNormal() const { return bUseSmoothingNormal; }
 	bool IsUsedAsyncCalculateMeshData() const { return bUsedAsyncCalculateMeshData; }
-	bool IsUsedDynamicMesh() const { return bUsedDynamicMesh; }
-	bool IsUsedProceduralMesh() const { return bUsedDynamicMesh == false; }
 
+	bool IsUsedAsyncPhysicsCooking() const { return bUsedAsyncPhysicsCooking; }
+
+	EChunkMeshGenerateType GetChunkGenType() const { return ChunkMeshGenType; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Defined Class")
 	TSubclassOf<AChunkWorld> ChunkWorldClass;
@@ -103,7 +104,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	bool bUsedAsyncCalculateMeshData;
 
-	/** 다이나믹 메시 사용 유무. false면 ProceduralMesh 사용 */
+
+	/** 비동기 물리 쿠킹을 사용할지 여부. true일 경우 시뮬레이션에서 외곽선을 그릴때 오류가 발생합니다.*/
 	UPROPERTY(EditDefaultsOnly)
-	bool bUsedDynamicMesh;
+	bool bUsedAsyncPhysicsCooking;
+
+	/** 청크 메시 생성 방법을 선택합니다. */
+	UPROPERTY(EditAnywhere)
+	EChunkMeshGenerateType ChunkMeshGenType;
 };

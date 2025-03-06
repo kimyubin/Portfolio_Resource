@@ -17,7 +17,10 @@
 		{
 			"Name": "Utilibrary",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PreDefault",
+			"AdditionalDependencies": [
+				"CoreUObject"
+			]
 		}
 	],
 	"Plugins": [

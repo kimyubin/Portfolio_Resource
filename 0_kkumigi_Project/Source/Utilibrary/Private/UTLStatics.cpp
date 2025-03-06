@@ -307,7 +307,17 @@ FVector2D UtlMath::ClampVector2D(const FVector2D& InVector2D, const FVector2D& A
 	               , FMath::Clamp(InVector2D.Y, InMin.Y, InMax.Y));
 }
 
-FVector UtlMath::ClampVector(const FVector& InVector, const FVector& A, const FVector& B)
+FVector UtlMath::ClampVector3D(const FVector& InVector, const FVector& A, const FVector& B)
+{
+	const FVector InMin = FVector(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y), FMath::Min(A.Z, B.Z));
+	const FVector InMax = FVector(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y), FMath::Max(A.Z, B.Z));
+
+	return FVector(FMath::Clamp(InVector.X, InMin.X, InMax.X)
+				 , FMath::Clamp(InVector.Y, InMin.Y, InMax.Y)
+				 , FMath::Clamp(InVector.Z, InMin.Z, InMax.Z));
+}
+
+FVector UtlMath::ClampVectorUncheckedZ(const FVector& InVector, const FVector& A, const FVector& B)
 {
 	const FVector InMin = FVector(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y), InVector.Z);
 	const FVector InMax = FVector(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y), InVector.Z);

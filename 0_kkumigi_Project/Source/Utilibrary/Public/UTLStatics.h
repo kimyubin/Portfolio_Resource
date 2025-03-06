@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "UtlLog.h"
+#include "Utilibrary.h"
 
 #include "magic_enum.h"
 
@@ -406,15 +407,29 @@ namespace UtlMath
 	 * @param B : 경계가 되는 사각형의 한쪽 모서리. A의 대각
 	 */
 	UTILIBRARY_API FVector2D ClampVector2D(const FVector2D& InVector2D, const FVector2D& A, const FVector2D& B);
-	
+
 	/**
-	 * 경계구역 체크. 좌상, 우하 순서 입력 권장. z축은 체크하지 않고, 입력된 z축을 그대로 반환.
+	 * Vector 멤버별 클램프 함수 입니다.
+	 * 각 축(X, Y, Z) 값을 두 벡터(A, B) 범위 내로 제한합니다.
+	 * 축 별로 min, max를 비교하기 때문에, A.X <= B.X를 보장합니다.(X, Y, Z 모두 동일) 
+	 * 
+	 * @param InVector : 체크할 벡터
+	 * @param A : 비교할 벡터
+	 * @param B : 비교할 벡터
+	 * @return : 클램프된 벡터
+	 */
+	UTILIBRARY_API FVector ClampVector3D(const FVector& InVector, const FVector& A, const FVector& B);
+
+	/**
+	 * 경계구역 체크. 좌상, 우하 순서 입력 권장.
+	 * z축은 체크하지 않고, 입력된 z축을 그대로 반환합니다.
+	 * 
 	 * @param InVector : 체크할 벡터
 	 * @param A : 경계가 되는 사각형의 한쪽 모서리. B의 대각 
 	 * @param B : 경계가 되는 사각형의 한쪽 모서리. A의 대각
 	 * @return : z축 제외 후 경계 체크된 벡터
 	 */
-	UTILIBRARY_API FVector ClampVector(const FVector& InVector, const FVector& A, const FVector& B);
+	UTILIBRARY_API FVector ClampVectorUncheckedZ(const FVector& InVector, const FVector& A, const FVector& B);
 
 	/**
 	 * 입력된 FRotator에서 Yaw값만 취한 후 리턴
@@ -593,6 +608,22 @@ namespace UtlMath
 	{
 		std::mt19937 rdEngine = GetRandomEngine();
 		shuffle(InRange.begin(), InRange.end(), rdEngine);
+	}
+
+	/**
+	 * 확률적으로 참을 반환합니다.
+	 * @param InRate 참일 확률 
+	 * @return 입력된 확률에 따라 참/거짓을 반환합니다.
+	 */
+	template <std::floating_point T>
+	FORCEINLINE bool GetRandomTrue(const T InRate)
+	{
+		if (InRate <= 0.0f)
+			return false;
+		if (InRate >= 1.0f)
+			return true;
+
+		return GetRealRandom(static_cast<T>(0.0), static_cast<T>(1.0)) < InRate;
 	}
 }
 

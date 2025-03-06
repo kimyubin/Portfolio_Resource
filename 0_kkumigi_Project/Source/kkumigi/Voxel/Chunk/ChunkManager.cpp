@@ -31,7 +31,8 @@ UChunkManager::UChunkManager()
 
 	bUseSmoothingNormal = true;
 	bUsedAsyncCalculateMeshData = true;
-	bUsedDynamicMesh = false;
+
+	bUsedAsyncPhysicsCooking = false;
 }
 
 void UChunkManager::Init()

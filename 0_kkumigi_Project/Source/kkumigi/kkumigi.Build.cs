@@ -28,6 +28,12 @@ public class kkumigi : ModuleRules
 			"UnrealEd",
 			
 			"ProceduralMeshComponent",
+
+			"MeshDescription",
+			"RenderCore",
+			"RHI",
+			"StaticMeshDescription",
+			"PhysicsCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

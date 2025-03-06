@@ -21,6 +21,7 @@
 #include "Voxel/Utils/VoxelFunctionLibrary.h"
 #include "Voxel/World/ChunkWorld.h"
 
+#include "UTLCommonTypes.h"
 #include "UTLStatics.h"
 
 AKuCharacter::AKuCharacter()
@@ -38,28 +39,42 @@ AKuCharacter::AKuCharacter()
 	GetCharacterMovement()->RotationRate                  = FRotator(0.0, 700.0, 0.0); // 기본값. 회전속도. 초당 회전 변화량. 속도 변경가능.
 	GetCharacterMovement()->SetWalkableFloorAngle(45.5f);
 
+
 	// 카메라 암 구성
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->SetUsingAbsoluteRotation(true);   // 캐릭터가 회전할 때 카메라가 따라 회전하는 거 방지
-	CameraBoom->bDoCollisionTest         = false; // 충돌할 때 카메라 암이 줄어드는거 방지
+	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+
+	SpringArmController = CreateDefaultSubobject<USpringArmControlComponent>(TEXT("SpringArmController"));
+	SpringArmController->SetupAttachment(RootComponent);
+	SpringArmController->SetDefaultConfig(SpringArm
+	                                    , FVector{-50.0, -50.0, 0.0}
+	                                    , FVector{50.0, 50.0, 0.0}
+	                                    , 13
+	                                    , 4
+	                                    , -70.0f
+	                                    , -5.0f
+	                                    , 2900.0f
+	                                    , 2600.0f);
+
+	SpringArm->SetupAttachment(SpringArmController);
+	SpringArm->SetUsingAbsoluteRotation(true); // 캐릭터 회전 시, 같이 회전하는 거 방지
+	SpringArm->bDoCollisionTest = false;       // 충돌할 때 카메라 암이 줄어드는거 방지
 
 	// 카메라 암 랙
-	CameraBoom->bEnableCameraLag         = true;
-	CameraBoom->bEnableCameraRotationLag = true;
-	CameraBoom->CameraLagSpeed           = 10.f;
-	CameraBoom->CameraRotationLagSpeed   = 10.f;
+	SpringArm->bEnableCameraLag         = true;
+	SpringArm->bEnableCameraRotationLag = true;
+	SpringArm->CameraLagSpeed           = 10.f;
+	SpringArm->CameraRotationLagSpeed   = 10.f;
 
 	// 카메라 암 각도 및 위치
-	CameraBoom->TargetArmLength = 2700.0f;                         //2100.0f;
-	CameraBoom->SocketOffset    = FVector(0.0);                    // 카메라 상대 위치
-	CameraBoom->TargetOffset    = FVector(0.0, 0.0, 30.0);         // 원점 상대 위치
-	CameraBoom->SetRelativeRotation(FRotator(-25.0f, 0.0f, 0.0f)); //(FRotator(-30.0f, 0.0f, 0.0f));
+	SpringArm->TargetArmLength = 2700.0f;                         //2100.0f;
+	SpringArm->SocketOffset    = FVector(0.0);                    // 카메라 상대 위치
+	SpringArm->TargetOffset    = FVector(0.0, 0.0, 30.0);         // 원점 상대 위치
+	SpringArm->SetRelativeRotation(FRotator(-25.0f, 0.0f, 0.0f)); //(FRotator(-30.0f, 0.0f, 0.0f));
 
 
 	// 카메라 구성
 	PlayerCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
-	PlayerCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	PlayerCamera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
 	PlayerCamera->SetProjectionMode(ECameraProjectionMode::Perspective);
 	PlayerCamera->bUsePawnControlRotation = false; // 카메라 암이 회전할 때 회전 방지
 
@@ -71,7 +86,7 @@ AKuCharacter::AKuCharacter()
 	PlayerCamera->PostProcessSettings.bOverride_DepthOfFieldDepthBlurAmount = true;
 	PlayerCamera->PostProcessSettings.bOverride_DepthOfFieldDepthBlurRadius = true;
 
-	PlayerCamera->PostProcessSettings.DepthOfFieldFocalDistance   = CameraBoom->TargetArmLength; // 500.0f;
+	PlayerCamera->PostProcessSettings.DepthOfFieldFocalDistance   = SpringArm->TargetArmLength;
 	PlayerCamera->PostProcessSettings.DepthOfFieldDepthBlurAmount = 0.5f;
 	PlayerCamera->PostProcessSettings.DepthOfFieldDepthBlurRadius = 6.0f;
 
@@ -81,6 +96,7 @@ AKuCharacter::AKuCharacter()
 
 	VoxelDetectionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("VoxelDetectionBox"));
 	VoxelDetectionBox->SetupAttachment(RootComponent);
+
 }
 
 void AKuCharacter::BeginPlay()
@@ -108,6 +124,7 @@ void AKuCharacter::Tick(float DeltaTime)
 	{
 		ChunkWorld->UpdatePlayerLocation(GetActorLocation());
 	}
+
 }
 
 void AKuCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -117,12 +134,14 @@ void AKuCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	const UKuInputConfig* PCInputConfig        = Cast<AKuPlayerController>(GetController())->InputActionsConfig;
 	UEnhancedInputComponent* EnhancedInputComp = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 
-	EnhancedInputComp->BindAction(PCInputConfig->IA_Move, ETriggerEvent::Triggered, this, &AKuCharacter::MoveCameraInput);
+	EnhancedInputComp->BindAction(PCInputConfig->IA_Move, ETriggerEvent::Triggered, this, &AKuCharacter::MoveCharacterInput);
+	EnhancedInputComp->BindAction(PCInputConfig->IA_WheelAxis, ETriggerEvent::Triggered, this, &AKuCharacter::ChangeCameraAngle);
+
 	EnhancedInputComp->BindAction(PCInputConfig->IA_LeftButton, ETriggerEvent::Triggered, this, &AKuCharacter::LeftButtonInput);
 	EnhancedInputComp->BindAction(PCInputConfig->IA_RightButton, ETriggerEvent::Triggered, this, &AKuCharacter::RightButtonInput);
 }
 
-void AKuCharacter::MoveCameraInput(const FInputActionValue& InputValue)
+void AKuCharacter::MoveCharacterInput(const FInputActionValue& InputValue)
 {
 	if (IsValid(Controller) == false)
 		return;
@@ -138,6 +157,11 @@ void AKuCharacter::MoveCameraInput(const FInputActionValue& InputValue)
 
 	AddMovementInput(ForwardDirection, InputVector.X);
 	AddMovementInput(RightDirection, InputVector.Y);
+}
+
+void AKuCharacter::ChangeCameraAngle(const FInputActionValue& InputValue)
+{
+	SpringArmController->ChangeCameraAngleInput(InputValue.Get<float>());
 }
 
 void AKuCharacter::LeftButtonInput(const FInputActionValue& InputValue)

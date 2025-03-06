@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+
 #include "KuCharacter.generated.h"
 
+class USpringArmControlComponent;
 class UKuGameInstance;
 class UBoxComponent;
 class AChunkWorld;
@@ -30,7 +32,8 @@ public:
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	void MoveCameraInput(const FInputActionValue& InputValue);
+	void MoveCharacterInput(const FInputActionValue& InputValue);
+	void ChangeCameraAngle(const FInputActionValue& InputValue);
 
 	void LeftButtonInput(const FInputActionValue& InputValue);
 	void RightButtonInput(const FInputActionValue& InputValue);
@@ -45,17 +48,20 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	TWeakObjectPtr<APostProcessVolume> MainPostProcessVolume;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraComponent, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCameraComponent> PlayerCamera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraComponent, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USpringArmComponent> CameraBoom;
+	TObjectPtr<USpringArmComponent> SpringArm;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = CameraComponent, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> PlayerCamera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCapsuleComponent> InteractionCapsule;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBoxComponent> VoxelDetectionBox;
-	
+
+private:
+	UPROPERTY(EditAnywhere, Category = CameraControlSettings, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USpringArmControlComponent> SpringArmController;
 };

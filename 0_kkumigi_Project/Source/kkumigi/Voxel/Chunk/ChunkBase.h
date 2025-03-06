@@ -13,6 +13,7 @@
 #include "ChunkBase.generated.h"
 
 
+class UAsyncProceduralMeshComponent;
 struct FProcMeshSection;
 class UDynamicMeshComponent;
 class FastNoiseLite;
@@ -174,6 +175,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UProceduralMeshComponent> ProceduralMesh;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UAsyncProceduralMeshComponent> AsyncProceduralMesh;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UDynamicMeshComponent> DynamicMesh;

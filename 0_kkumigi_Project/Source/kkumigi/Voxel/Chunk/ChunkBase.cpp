@@ -9,6 +9,7 @@
 #include "ProceduralMeshComponent.h"
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/MeshAttributeUtil.h"
+#include "kkumigi/AsyncProceduralMeshComponent.h"
 #include "kkumigi/KuPlayData.h"
 #include "kkumigi/Voxel/World/ChunkWorld.h"
 
@@ -22,19 +23,30 @@ AChunkBase::AChunkBase()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	SetRootComponent(Root);
+
+	AsyncProceduralMesh = CreateDefaultSubobject<UAsyncProceduralMeshComponent>("AsyncProceduralMesh");
+	AsyncProceduralMesh->SetCastShadow(true);
+	AsyncProceduralMesh->SetupAttachment(RootComponent);
+	AsyncProceduralMesh->SetBoundsScale(10.0f);
+
 	ProceduralMesh = CreateDefaultSubobject<UProceduralMeshComponent>("ProceduralMesh");
 	ProceduralMesh->SetCastShadow(true);
-	SetRootComponent(ProceduralMesh);
+	ProceduralMesh->SetupAttachment(RootComponent);
+	ProceduralMesh->SetBoundsScale(10.0f);
 
 	DynamicMesh = CreateDefaultSubobject<UDynamicMeshComponent>("DynamicMesh");
 	DynamicMesh->SetCastShadow(true);
 	DynamicMesh->SetupAttachment(RootComponent);
+	DynamicMesh->SetBoundsScale(10.0f);
 	DynamicMesh->EnableComplexAsSimpleCollision();
 	DynamicMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	DynamicMesh->SetCollisionObjectType(ECollisionChannel::ECC_WorldStatic);
 
 	ChunkSizeVec = FIdxVector(32);
 	SurfaceLevel = 0.0f;
+
 	bModifiedData = false;
 }
 
@@ -165,24 +177,21 @@ void AChunkBase::InitializeChunkData(const FVector& InPosition)
 
 void AChunkBase::CreateChunkMesh()
 {
+	AsyncProceduralMesh->SetMaterial(0, Material);
 	ProceduralMesh->SetMaterial(0, Material);
 	DynamicMesh->SetMaterial(0, Material);
 
+	ClearMesh();
+
 	if (GetChunkManager()->IsUsedAsyncCalculateMeshData())
 	{
-		ClearMesh();
 		AsyncGenerateMesh();
 	}
 	else
 	{
-		ClearMesh();
-
 		CalculateMeshData();
-		
-		UE_LOG(LogTemp, Warning, TEXT("Vertex Count : %d"), MeshData.VertexCount);
 
 		ApplyMesh();
-
 	}
 }
 
@@ -629,10 +638,15 @@ void AChunkBase::ApplyMesh()
 	// 메시 idx 갱신
 	ChunkMeshIdx = ChunkPositionIdx;
 
-	if (GetChunkManager()->IsUsedProceduralMesh())
+	ProceduralMesh->bUseAsyncCooking      = GetChunkManager()->IsUsedAsyncPhysicsCooking();
+	AsyncProceduralMesh->bUseAsyncCooking = GetChunkManager()->IsUsedAsyncPhysicsCooking();
+	DynamicMesh->bUseAsyncCooking         = GetChunkManager()->IsUsedAsyncPhysicsCooking();
+
+	if (GetChunkManager()->IsUsedAsyncCalculateMeshData())
 	{
-		// ProceduralMesh->bUseAsyncCooking = true;
-		if (GetChunkManager()->IsUsedAsyncCalculateMeshData() == false)
+		switch (GetChunkManager()->GetChunkGenType())
+		{
+		case EChunkMeshGenerateType::UsedCreateMeshSection:
 		{
 			ProceduralMesh->CreateMeshSection(0
 			                                , MeshData.Vertices
@@ -642,20 +656,42 @@ void AChunkBase::ApplyMesh()
 			                                , MeshData.Colors
 			                                , TArray<FProcMeshTangent>()
 			                                , true);
+			break;
 		}
-		else
+		case EChunkMeshGenerateType::UsedSetProcMove:
 		{
 			ProceduralMesh->SetProcMeshSection(0, FProcMeshSection());
 			FProcMeshSection* ProcSection = ProceduralMesh->GetProcMeshSection(0);
 			*ProcSection = MoveTemp(MeshData.NewMeshSection);
 
 			ProceduralMesh->SetProcMeshSection(1, FProcMeshSection());
+			break;
+		}
+		case EChunkMeshGenerateType::UsedAsyncProcMesh:
+		{
+			AsyncProceduralMesh->SetAsyncProcMeshSection(0, MoveTemp(MeshData.NewMeshSection));
+			break;
+		}
+		case EChunkMeshGenerateType::UsedDynamic:
+		{
+			DynamicMesh->SetMesh(MoveTemp(MeshData.DynamicMesh3));
+			break;
+		}
+		default:
+		{
+		};
 		}
 	}
 	else
 	{
-		// DynamicMesh->bUseAsyncCooking = true;
-		DynamicMesh->SetMesh(MoveTemp(MeshData.DynamicMesh3));
+		ProceduralMesh->CreateMeshSection(0
+		                                , MeshData.Vertices
+		                                , MeshData.Triangles
+		                                , MeshData.Normals
+		                                , MeshData.UV0
+		                                , MeshData.Colors
+		                                , TArray<FProcMeshTangent>()
+		                                , true);
 	}
 
 	RootComponent->SetVisibility(true, true);

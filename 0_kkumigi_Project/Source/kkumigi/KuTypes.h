@@ -311,3 +311,16 @@ public:
 	}
 };
 
+UENUM(BlueprintType)
+enum class EChunkMeshGenerateType : uint8
+{
+	None
+
+  , UsedCreateMeshSection // Proc메시 + CreateMeshSection 사용	
+  , UsedSetProcMove       // Proc메시 + Move 편법 사용
+  , UsedAsyncProcMesh     // AsyncProc메시 사용
+  , UsedDynamic           // 다이나믹 메시 사용
+
+
+  , Size UMETA(Hidden)
+};
