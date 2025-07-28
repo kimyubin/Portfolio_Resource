@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TextEditTranslateWidget</class>
+ <widget class="QWidget" name="TextEditTranslateWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>958</width>
+    <height>706</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>TextEditTranslateWidget</string>
+  </property>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>30</y>
+     <width>721</width>
+     <height>481</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="mainLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item row="0" column="0">
+     <layout class="QHBoxLayout" name="LangSelectLayout">
+      <item alignment="Qt::AlignmentFlag::AlignHCenter|Qt::AlignmentFlag::AlignVCenter">
+       <widget class="QPushButton" name="languageSwapButton">
+        <property name="maximumSize">
+         <size>
+          <width>64</width>
+          <height>64</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>⮂</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="1" column="0">
+     <layout class="QHBoxLayout" name="TextEditLayout">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="MenuPlainTextEdit" name="srcTextEdit"/>
+      </item>
+      <item>
+       <widget class="LayoutTextEdit" name="trTextEdit"/>
+      </item>
+     </layout>
+    </item>
+    <item row="2" column="0">
+     <layout class="QHBoxLayout" name="BottomLayout"/>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MenuPlainTextEdit</class>
+   <extends>QPlainTextEdit</extends>
+   <header>SubWidgets/CustomMenuTextEdit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>LayoutTextEdit</class>
+   <extends>QTextEdit</extends>
+   <header>SubWidgets/LayoutTextEdit.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

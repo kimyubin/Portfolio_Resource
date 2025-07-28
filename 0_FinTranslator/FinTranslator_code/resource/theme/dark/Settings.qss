@@ -1,0 +1,85 @@
+/*  ------------------------------------------------------------------------  */
+/* QtMaterial - https://github.com/UN-GCPDS/qt-material
+/* By Yeison Cardona - GCPDS
+/*  ------------------------------------------------------------------------  */
+#SettingsWidget
+{
+  background-color: rgba(50, 55, 60, 1);
+}
+
+/* #SettingsWidget QGroupBox, */
+/* #SettingsWidget QFrame
+{
+  background-color: rgba(50, 55, 60, 1);
+} */
+
+#SettingsWidget QSplitter
+{
+  background-color: transparent;
+  border: none
+}
+
+#SettingsWidget QStatusBar
+{
+  color: #ffffff;
+  background-color: rgba(79, 91, 98, 0.2);
+  border-radius: 0px;
+}
+
+#SettingsWidget QScrollArea,
+#SettingsWidget QStackedWidget,
+#SettingsWidget QWidget > QToolBox,
+#SettingsWidget QToolBox > QWidget,
+#SettingsWidget QTabWidget > QWidget
+{
+  border: none;
+}
+
+#SettingsWidget QTabWidget::pane
+{
+  border: none;
+}
+
+#SettingsWidget QLabel
+{
+  border: none;
+  background: transparent;
+  color: #ffffff
+}
+#SettingsWidget  QLabel:disabled
+{
+  color: rgba(255, 255, 255, 0.2)
+}
+
+
+#SettingsWidget  QLineEdit
+{
+  color: #ffffff;
+  padding-left: 8px;
+  height: 32px;
+  background-color: rgba(35, 38, 41, 0.75);
+  border-width: 0 0 2px 0;
+}
+
+#SettingsWidget QGroupBox
+{
+  font-size: 16px;
+  border: none;
+  padding-top: 24px;
+  margin-top: 0.5em;
+  
+}
+
+#SettingsWidget QGroupBox::title
+{
+  color: rgba(255, 255, 255, 0.67);
+  subcontrol-origin: margin;
+}
+
+#SettingsWidget QPushButton[selectButton="true"]
+{
+  border: none;
+  background-color:rgb(68, 93, 116);
+  color:rgb(240, 240, 232)
+}
+

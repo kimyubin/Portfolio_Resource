@@ -1,0 +1,27 @@
+<RCC>
+    <qresource prefix="/img">
+        <file alias="icon_img.png">icon.png</file>
+        <file alias="icon_img">translate_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+        
+        <file alias="keep_pin_fill_v">keep_48dp_E3E3E3_FILL1_wght700_GRAD200_opsz48_color.svg</file>
+        <file alias="keep_pin_clock45d">keep_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48_45dgree.svg</file>
+
+        <file alias="window_mode_img">toolbar_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+
+        <file alias="settings_gear_img">settings_48dp_E3E3E3_FILL1_wght400_GRAD200_opsz48.svg</file>
+
+        <file alias="minimize_button_img">minimize_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+
+        <file alias="maximize_button_img">crop_square_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+        <file alias="restore_button_img">restore.svg</file>
+
+        <file alias="close_button_img">close_48dp_E3E3E3_FILL0_wght300_GRAD0_opsz48.svg</file>
+
+        <file alias="wait_anim_img">linear_progress_indeterminate.svg</file>
+
+        <file alias="text_caret_cursor">text_select_match_case_48e3_w700_G200_800.svg</file>
+        <file alias="document_img">docs_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+
+        <file alias="copy_img">content_copy_48dp_E3E3E3_FILL0_wght700_GRAD200_opsz48.svg</file>
+    </qresource>
+</RCC>

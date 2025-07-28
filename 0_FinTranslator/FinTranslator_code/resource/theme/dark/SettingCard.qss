@@ -1,0 +1,50 @@
+#SettingCard 
+{
+  border-bottom: 1px solid #4f5b62;
+  border-radius: 0px;
+  padding-bottom : 8px;
+}
+
+#SettingCard QLabel#SettingHeaderText
+{
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 16px;
+}
+
+#SettingCard QLabel#SettingDescriptionText
+{
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 14px;
+}
+
+SwitchButton
+{
+  qproperty-switchSize: 46px 28px;
+  qproperty-trackHeightRatio: 1;
+  qproperty-HandleRatio: 0.714285;
+}
+
+
+SwitchButton
+{
+  qproperty-switchSize: 44px 26px;
+  qproperty-trackHeightRatio: 1;
+  qproperty-HandleRatio: 0.72;
+}
+
+SwitchButton
+{
+  qproperty-barCheckedColor: rgba(0, 176, 255, 1);
+  qproperty-barUncheckedColor: gray;
+
+  qproperty-handleCheckedColor: white;
+  qproperty-handleUncheckedColor: white;
+  
+  qproperty-barBorderColor: transparent;
+  qproperty-barFocusBorderColor: white;
+  /* qproperty-barBorderWidth: ; */
+  qproperty-barFocusBorderWidth: 1.8;
+
+  qproperty-handleCheckedBorderColor: transparent;
+  qproperty-handleUncheckedBorderColor: transparent;
+}
