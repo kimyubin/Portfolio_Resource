@@ -36,6 +36,8 @@ qt_add_executable(FinTranslator
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         external/magic_enum.hpp
+        src/Widgets/PopupTranslateWidget.cpp
+        src/Widgets/PopupTranslateWidget.h
 )
 
 if (WIN32)

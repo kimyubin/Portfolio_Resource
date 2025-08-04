@@ -9,11 +9,15 @@
 #include "Managers/ConfigManager.h"
 #include "Managers/TranslateManager.h"
 
+#include "Widgets/ITranslateWidget.h"
+
 TranslateUnit::TranslateUnit(const TranslateRequestInfo& inTranslateRequestInfo
                            , TranslateManager* parent)
     : QObject(parent)
     , _trReqData(inTranslateRequestInfo)
 {
+    Q_ASSERT(_trReqData.trTargetWidget);
+    _trReqData.trTargetWidget->setTrUnit(this);
 }
 
 void TranslateUnit::executeTextTranslation()
@@ -25,14 +29,8 @@ void TranslateUnit::executeTextTranslation()
         completeTranslatedText(_trReqData.originText);
         return;
     }
-    if (_trReqData.callbackTranslateStreaming.has_value())
-    {
-        connect(this, &TranslateUnit::addStreamTranslatedText, _trReqData.streamContext, std::move((*_trReqData.callbackTranslateStreaming)));
-    }
 
-    connect(this, &TranslateUnit::onCompletedTranslate, _trReqData.completeContext, std::move(_trReqData.callbackTranslateComplete));
-
-    if (TranslateManager* translate_manager = finCore->getTranslateManager())
+    if (TranslateManager* translate_manager = finCore->translateManager())
     {
         auto [bIsFind, findCache] = translate_manager->findCachingText(_trReqData.engineType
                                                                      , _trReqData.originText
@@ -53,13 +51,13 @@ void TranslateUnit::executeTextTranslation()
 
 void TranslateUnit::get(const QNetworkRequest& request)
 {
-    _reply = finCore->getTranslateManager()->getNetworkAccessManager()->get(request);
+    _reply = finCore->translateManager()->getNetworkAccessManager()->get(request);
     postProcess();
 }
 
 void TranslateUnit::post(const QNetworkRequest& request, const QByteArray& data, const bool bIsStreaming)
 {
-    _reply = finCore->getTranslateManager()->getNetworkAccessManager()->post(request, data);
+    _reply = finCore->translateManager()->getNetworkAccessManager()->post(request, data);
 
     if (bIsStreaming)
     {
@@ -98,13 +96,22 @@ void TranslateUnit::abortTranslate()
     {
         qDebug() << "abort translate request";
         _reply->abort();
+
+        _trReqData.streamContext              = nullptr;
+        _trReqData.callbackTranslateStreaming = nullptr;
+        _trReqData.completeContext            = nullptr;
+        _trReqData.callbackTranslateComplete  = nullptr;
     }
 }
 
 void TranslateUnit::addTranslatedText(const QString& inTranslatedText)
 {
     _translatedText.append(inTranslatedText);
-    emit addStreamTranslatedText(_translatedText);
+
+    if (_trReqData.streamContext && _trReqData.callbackTranslateStreaming)
+    {
+        (*_trReqData.callbackTranslateStreaming)(_translatedText);
+    }
 }
 
 void TranslateUnit::completeTranslatedText(const QString& inTranslatedText)
@@ -122,6 +129,10 @@ void TranslateUnit::completeTranslatedText(const QString& inTranslatedText)
     }
 
     // 빈 문자열도 적용합니다.
-    emit onCompletedTranslate(inTranslatedText);
+    if (_trReqData.completeContext && _trReqData.callbackTranslateComplete)
+    {
+        _trReqData.callbackTranslateComplete(inTranslatedText);
+    }
+
     deleteLater();
 }

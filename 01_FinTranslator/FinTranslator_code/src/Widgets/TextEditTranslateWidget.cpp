@@ -5,7 +5,6 @@
 #include <QClipboard>
 #include <QLineEdit>
 #include <QMenu>
-#include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QTimer>
 
@@ -34,8 +33,9 @@ TextEditTranslateWidget::TextEditTranslateWidget(QWidget* parent)
 
     ui->TextEditLayout->setSpacing(8);
 
-    ui->srcTextEdit->setTabChangesFocus(true);
     ui->srcTextEdit->setAccessibleName(tr("번역 원문 입력 편집기"));
+    ui->srcTextEdit->setTabChangesFocus(true);
+    ui->srcTextEdit->setAcceptRichText(false);
 
     ui->trTextEdit->setAccessibleName(tr("번역 결과"));
     ui->trTextEdit->setTabChangesFocus(true);
@@ -47,29 +47,6 @@ TextEditTranslateWidget::TextEditTranslateWidget(QWidget* parent)
         // Qt::LinksAccessibleByMouse |
         // Qt::LinksAccessibleByKeyboard
     );
-
-    // 전체 복사 버튼
-    QPushButton* trCopy = new QPushButton(ui->trTextEdit);
-    trCopy->setIcon(QIcon(":/img/copy_img"));
-    trCopy->setFocusPolicy(Qt::TabFocus);
-    FinTooltipFilter::setBubbleToolTip(trCopy, tr("번역 복사"));
-    ui->trTextEdit->getLayout()->addWidget(trCopy, 0, Qt::AlignLeft);
-    connect(trCopy, &QPushButton::clicked, this, [this, trCopy]()
-    {
-        QMetaObject::Connection connection = connect(QApplication::clipboard(), &QClipboard::dataChanged, trCopy, [trCopy]() mutable
-        {
-            FinToast::popToastOnWidget(tr("복사 완료!"), trCopy);
-        }, Qt::SingleShotConnection);
-
-        // 연결 대기 시간 제한.
-        // 비어있는 복사와 무제한 대기를 방지합니다.
-        QTimer::singleShot(500, this, [connection]()
-        {
-            disconnect(connection);
-        });
-
-        QGuiApplication::clipboard()->setText(ui->trTextEdit->toPlainText());
-    });
 
 
     // 출발언어 선택기
@@ -113,17 +90,42 @@ TextEditTranslateWidget::TextEditTranslateWidget(QWidget* parent)
     });
 
 
+    // 전체 복사 버튼
+    QPushButton* trCopy = new QPushButton(ui->trTextEdit);
+    trCopy->setIcon(QIcon(":/img/copy_img"));
+    trCopy->setFocusPolicy(Qt::TabFocus);
+    FinTooltipFilter::setBubbleToolTip(trCopy, tr("번역 복사"));
+    ui->trTextEdit->getLayout()->addWidget(trCopy, 0, Qt::AlignLeft);
+    connect(trCopy, &QPushButton::clicked, this, [this, trCopy]()
+    {
+        QMetaObject::Connection connection = connect(QApplication::clipboard(), &QClipboard::dataChanged, trCopy, [trCopy]() mutable
+        {
+            FinToast::popToastOnWidget(tr("복사 완료!"), trCopy);
+        }, Qt::SingleShotConnection);
+
+        // 연결 대기 시간 제한.
+        // 비어있는 복사와 무제한 대기를 방지합니다.
+        QTimer::singleShot(500, this, [connection]()
+        {
+            disconnect(connection);
+        });
+
+        QGuiApplication::clipboard()->setText(ui->trTextEdit->toPlainText());
+    });
+
+
     // 번역 실행 타이머
     _translationExecutionTimer = new QTimer(this);
     _translationExecutionTimer->setInterval(500);
     _translationExecutionTimer->setSingleShot(true);
     connect(_translationExecutionTimer, &QTimer::timeout, this, &TextEditTranslateWidget::onExecuteTranslate);
-    connect(ui->srcTextEdit, &QPlainTextEdit::textChanged, this, [this]()
+    connect(ui->srcTextEdit, &QTextEdit::textChanged, this, [this]()
     {
         _translationExecutionTimer->start();
     });
 
     setTabOrder({_srcLangSelector, ui->srcTextEdit, ui->languageSwapButton, _targetLangSelector, ui->trTextEdit});
+    setFocusProxy(_srcLangSelector);
 }
 
 TextEditTranslateWidget::~TextEditTranslateWidget()
@@ -146,6 +148,16 @@ QScrollBar* TextEditTranslateWidget::getHorizontalScrollBar()
     return ui->trTextEdit->horizontalScrollBar();
 }
 
+QTextCursor TextEditTranslateWidget::getTextCursor()
+{
+    return ui->trTextEdit->textCursor();
+}
+
+void TextEditTranslateWidget::setTextCursor(const QTextCursor& cursor)
+{
+    ui->trTextEdit->setTextCursor(cursor);
+}
+
 void TextEditTranslateWidget::focusTextOrigin()
 {
     ui->srcTextEdit->setFocus();
@@ -153,6 +165,8 @@ void TextEditTranslateWidget::focusTextOrigin()
 
 void TextEditTranslateWidget::onExecuteTranslate()
 {
+    abortTrUnit();
+
     const QString orignText = ui->srcTextEdit->toPlainText();
     if (orignText.isEmpty())
     {
@@ -161,8 +175,9 @@ void TextEditTranslateWidget::onExecuteTranslate()
     }
     ui->trTextEdit->setPlainText(tr("번역 중..."));
 
-    finCore->getTranslateManager()->translateText(TranslateRequestInfo{
-        finConfig.getCurrentEngineType()
+    finCore->translateManager()->translateText(TranslateRequestInfo{
+        this
+      , finConfig.getCurrentEngineType()
       , orignText
       , TextStyle::PlainText
       , finConfig.getTextSrcLang()

@@ -108,9 +108,9 @@ FinTranslatorMainWidget::FinTranslatorMainWidget(QWidget* parent)
     // setting button
     ui->settingsButton->setCheckable(false);
     ui->settingsButton->setText(tr("설정"));
+    ui->settingsButton->setIcon(QIcon(":/img/settings_gear_img"));
     ui->settingsButton->setFocusPolicy(Qt::TabFocus);
     connect(ui->settingsButton, &QAbstractButton::clicked, this, &FinTranslatorMainWidget::showSettingsWidget);
-    ui->settingsButton->setIcon(QIcon(":/img/settings_gear_img"));
 
 
     // ~====================
@@ -125,7 +125,7 @@ FinTranslatorMainWidget::FinTranslatorMainWidget(QWidget* parent)
     finConfig.restoreWidgetGeometry(this);
     connect(qApp, &QCoreApplication::aboutToQuit, this, &FinTranslatorMainWidget::onAppQuitEvent);
 
-    setTabOrder(_engineSelector, _settingsWidget);
+    setTabOrder({ui->mainStackedWidget, ui->textTabButton, _engineSelector, ui->settingsButton});
 }
 
 FinTranslatorMainWidget::~FinTranslatorMainWidget()

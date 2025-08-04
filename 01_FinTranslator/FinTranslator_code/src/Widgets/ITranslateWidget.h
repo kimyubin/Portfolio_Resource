@@ -3,10 +3,13 @@
 #ifndef ITRANSLATEWIDGET_H
 #define ITRANSLATEWIDGET_H
 
+#include <QPointer>
 #include <QWidget>
 
 #include "FinTypes.h"
 
+class TranslateUnit;
+class QTextCursor;
 class QScrollBar;
 
 class ITranslateWidget : public QWidget
@@ -21,6 +24,10 @@ public:
     virtual void streamTransText(const QString& inTranslatedText, const TextStyle inTextStyle);
 
     virtual void completeTransText(const QString& inTranslatedText, const TextStyle inTextStyle);
+
+    void abortTrUnit();
+
+    void setTrUnit(TranslateUnit* inTrUnit);
 
 protected:
     /**
@@ -47,6 +54,13 @@ protected:
     virtual QScrollBar* getVerticalScrollBar() = 0;
     virtual QScrollBar* getHorizontalScrollBar() = 0;
 
+    /**
+     * 번역 중, 커서 위치를 고정하기 위해 사용할 텍스트 커서
+     */
+    virtual QTextCursor getTextCursor() = 0;
+    virtual void setTextCursor(const QTextCursor& cursor) = 0;
+
+    QPointer<TranslateUnit> _trUnit;
 
     QString _translatedText;        // 번역문자열 보관
     TextStyle _translatedTextStyle; // 번역문자열의 스타일

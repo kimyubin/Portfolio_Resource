@@ -19,7 +19,7 @@
 #include "EngineUnits/GoogleEngine/GoogleTrUnit.h"
 #include "EngineUnits/OpenAI/OpenAiTrUnit.h"
 
-#include "Widgets/SimpleTranslatePopup.h"
+#include "Widgets/PopupTranslateWidget.h"
 
 
 TranslateManager::TranslateManager(FinTranslatorCore* parent): AbstractManager(parent)
@@ -83,20 +83,22 @@ QPointer<TranslateUnit> TranslateManager::translateText(const TranslateRequestIn
     return QPointer<TranslateUnit>{transUnit};
 }
 
-void TranslateManager::translateSimple(const QMimeData* inMimeData
-                                     , const LangType inSourceLang
-                                     , const LangType inTargetLang)
+void TranslateManager::translateAtPopup(const QMimeData* inMimeData
+                                      , const LangType inSourceLang
+                                      , const LangType inTargetLang)
 {
     if (inMimeData->hasText() == false)
     {
         return;
     }
 
-    SimpleTranslatePopup* simple = new SimpleTranslatePopup();
-    auto runSimpleTranslate = [=, this](const QString& inOriginText, const TextStyle inTextStyle)
+    PopupTranslateWidget* simple = new PopupTranslateWidget();
+
+    auto runPopupTranslate = [this, inSourceLang, inTargetLang, simple](const QString& inOriginText, const TextStyle inTextStyle)
     {
-        QPointer<TranslateUnit> transUnit = translateText(TranslateRequestInfo{
-            finConfig.getCurrentEngineType()
+        translateText(TranslateRequestInfo{
+            simple
+          , finConfig.getCurrentEngineType()
           , inOriginText
           , inTextStyle
           , inSourceLang
@@ -106,16 +108,6 @@ void TranslateManager::translateSimple(const QMimeData* inMimeData
           , simple
           , [=](const QString& inStr) { simple->streamTransText(inStr, inTextStyle); }
         });
-
-        connect(simple, &SimpleTranslatePopup::abortTranslateReq, transUnit, [=]()
-        {
-            if (transUnit.isNull())
-            {
-                return;
-            }
-            // todo: history 개발 후, 제거해야합니다.
-            transUnit->abortTranslate();
-        });
     };
 
 
@@ -123,7 +115,7 @@ void TranslateManager::translateSimple(const QMimeData* inMimeData
     {
         AsyncManager::asyncLaunch<QString>(
             simple,
-            [=, htmlStr = std::move(inMimeData->html())]() mutable
+            [htmlStr = std::move(inMimeData->html())]() mutable
             {
                 // list 무시하는 문법 제거.
                 QTextDocument txtDoc;
@@ -133,12 +125,12 @@ void TranslateManager::translateSimple(const QMimeData* inMimeData
             },
             [=](const QString& inMd)
             {
-                runSimpleTranslate(inMd, TextStyle::MarkDown);
+                runPopupTranslate(inMd, TextStyle::MarkDown);
             });
     }
     else
     {
-        runSimpleTranslate(inMimeData->text(), TextStyle::PlainText);
+        runPopupTranslate(inMimeData->text(), TextStyle::PlainText);
     }
 }
 
