@@ -41,6 +41,9 @@ public:
     void setOpenAIModel(const QString& inModelName);
     QString getOpenAIModel();
 
+    void setOpenAI_Temperature(const double inTemperature);
+    double getOpenAI_Temperature();
+
     void setStartRun(const bool inStartRun);
     bool getStartRun();
 
@@ -68,6 +71,14 @@ public:
     /** 창의 위치와 크기를 저장합니다. */
     void saveWidgetGeometry(const QWidget* inWidget);
     bool restoreWidgetGeometry(QWidget* inWidget);
+
+    /**
+     * 팝업 번역창의 임시창 유무.
+     * 임시창이면 포커스 이탈시, 창이 자동으로 닫힙니다.
+     * 기본값은 false입니다.
+     */
+    void setIsPopupTrWindowTemp(const bool inTemp);
+    bool getIsPopupTrWindowTemp();
 
     /** 메인 창을 처음 닫은 후 호출합니다.*/
     void setFirstCloseToTray();

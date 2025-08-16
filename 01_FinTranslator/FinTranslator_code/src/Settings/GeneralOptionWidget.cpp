@@ -4,6 +4,7 @@
 
 #include <QGroupBox>
 #include <QPushButton>
+#include <QVBoxLayout>
 
 #include "FinTranslatorCore.h"
 #include "Managers/ConfigManager.h"
@@ -11,7 +12,6 @@
 #include "SubWidgets/SwitchButton.h"
 #include "Widgets/FinTranslatorMainWidget.h"
 
-#include "ui_GeneralOptionWidget.h"
 
 #include "Managers/StyleManger.h"
 
@@ -20,13 +20,10 @@
 
 GeneralOptionWidget::GeneralOptionWidget(QWidget* parent)
     : IOptionWidget(parent)
-    , ui(new Ui::GeneralOptionWidget)
 {
-    ui->setupUi(this);
-    setLayout(ui->mainLayout);
-    ui->mainLayout->setContentsMargins(0, 0, 0, 0);
+    setObjectName("GeneralOptionWidget");
 
-    auto [shapeBehaviorGroup, shapeBehaviorVLay] = newOptionGroupBox(tr("모양 및 동작"), ui->mainLayout, ui->mainLayout->rowCount(), 0);
+    auto [shapeBehaviorGroup, shapeBehaviorVLay] = addNewOptionGroupBox(tr("모양 및 동작"));
 
     // 시작시 실행
     {
@@ -34,16 +31,47 @@ GeneralOptionWidget::GeneralOptionWidget(QWidget* parent)
         startRunCard->setHeader(tr("시작 시 실행"));
         startRunCard->setDescription(tr("시스템 시작 시 Fin번역기가 자동으로 실행됩니다."));
         SwitchButton* startRunSwitch = startRunCard->getContent<SwitchButton>();
-        connect(startRunSwitch, &QCheckBox::checkStateChanged, this, [](Qt::CheckState inState)
+        connect(startRunSwitch, &QCheckBox::checkStateChanged, this, [](const Qt::CheckState inState)
         {
             finConfig.setStartRun(inState == Qt::CheckState::Checked);
         });
         shapeBehaviorVLay->addWidget(startRunCard, 0, Qt::AlignmentFlag::AlignTop);
     }
 
+    // 창 위치 크기 기억
+    {
+        SettingCard* rememberWindow = new SettingCard(new SwitchButton(finConfig.getIsRememberWindowGeometry()), shapeBehaviorGroup);
+        rememberWindow->setHeader(tr("창 위치, 크기 기억"));
+        rememberWindow->setDescription(tr("다시 시작할 때, 이전 창의 위치와 크기로 복원합니다."));
+        SwitchButton* remWindowSwitch = rememberWindow->getContent<SwitchButton>();
+        connect(remWindowSwitch, &QCheckBox::checkStateChanged, this, [](const Qt::CheckState inState)
+        {
+            finConfig.setIsRememberWindowGeometry(inState == Qt::CheckState::Checked);
+        });
+        shapeBehaviorVLay->addWidget(rememberWindow, 0, Qt::AlignmentFlag::AlignTop);
+    }
+
+
+    // 테마 적용 버튼
+    {
+        SettingCard* themeCard = new SettingCard(new QPushButton(tr("적용")), shapeBehaviorGroup);
+        themeCard->setHeader(tr("테마 적용"));
+        themeCard->setDescription(tr("테마를 적용합니다."));
+        QPushButton* themeButton = themeCard->getContent<QPushButton>();
+        themeButton->setFocusPolicy(Qt::TabFocus);
+        themeButton->setCheckable(false);
+        connect(themeButton, &QPushButton::clicked, this, []()
+        {
+            StyleManger::applyTheme();
+        });
+        shapeBehaviorVLay->addWidget(themeCard, 0, Qt::AlignmentFlag::AlignTop);
+    }
+
+    auto [popupTrGroup, popupTrVLay] = addNewOptionGroupBox(tr("팝업 번역"));
+
     // 팝업번역 도착언어 선택
     {
-        SettingCard* selectTargetLang = new SettingCard(new DropdownMenu, shapeBehaviorGroup);
+        SettingCard* selectTargetLang = new SettingCard(new DropdownMenu, popupTrGroup);
         selectTargetLang->setHeader(tr("목표 언어"));
         selectTargetLang->setDescription(tr("팝업 번역의 목표가 되는 언어를 선택합니다."));
 
@@ -66,59 +94,30 @@ GeneralOptionWidget::GeneralOptionWidget(QWidget* parent)
         const int curLangIdx         = selectCombo->findData(static_cast<int>(curTargetLang));
         selectCombo->setCurrentIndex(curLangIdx);
 
-        shapeBehaviorVLay->addWidget(selectTargetLang, 0, Qt::AlignmentFlag::AlignTop);
+        popupTrVLay->addWidget(selectTargetLang, 0, Qt::AlignmentFlag::AlignTop);
     }
 
-    // 창 위치 크기 기억
+    // 팝업 임시창 선택
     {
-        SettingCard* rememberWindow = new SettingCard(new SwitchButton(finConfig.getIsRememberWindowGeometry()), shapeBehaviorGroup);
-        rememberWindow->setHeader(tr("창 위치, 크기 기억"));
-        rememberWindow->setDescription(tr("다시 시작할 때, 이전 창의 위치와 크기로 복원합니다."));
-        SwitchButton* remWindowSwitch = rememberWindow->getContent<SwitchButton>();
-        connect(remWindowSwitch, &QCheckBox::checkStateChanged, this, [](Qt::CheckState inState)
+        SettingCard* popupTempCard = new SettingCard(new SwitchButton(finConfig.getIsPopupTrWindowTemp()), popupTrGroup);
+        popupTempCard->setHeader(tr("팝업 번역창을 임시창으로 열기"));
+        popupTempCard->setDescription(tr("팝업 번역창이 임시창으로 생성됩니다. 번역 중 다른 곳을 클릭하면 번역창이 닫힙니다."));
+        SwitchButton* popupTempSwitch = popupTempCard->getContent<SwitchButton>();
+        connect(popupTempSwitch, &QCheckBox::checkStateChanged, this, [](const Qt::CheckState inState)
         {
-            finConfig.setIsRememberWindowGeometry(inState == Qt::CheckState::Checked);
+            finConfig.setIsPopupTrWindowTemp(inState == Qt::CheckState::Checked);
         });
-        shapeBehaviorVLay->addWidget(rememberWindow, 0, Qt::AlignmentFlag::AlignTop);
+        popupTrVLay->addWidget(popupTempCard, 0, Qt::AlignmentFlag::AlignTop);
     }
 
 
-    // 테마 적용 버튼
-    {
-        SettingCard* themeCard = new SettingCard(new QPushButton(tr("적용")), shapeBehaviorGroup);
-        themeCard->setHeader(tr("테마 적용"));
-        themeCard->setDescription(tr("테마를 적용합니다."));
-        QPushButton* themeButton = themeCard->getContent<QPushButton>();
-        themeButton->setFocusPolicy(Qt::TabFocus);
-        themeButton->setCheckable(false);
-        connect(themeButton, &QPushButton::clicked, this, []()
-        {
-            StyleManger::applyTheme();
-        });
-        shapeBehaviorVLay->addWidget(themeCard, 0, Qt::AlignmentFlag::AlignTop);
-    }
+    initializeAfterCtor();
 }
 
 GeneralOptionWidget::~GeneralOptionWidget()
 {
-    delete ui;
 }
 
-
-void GeneralOptionWidget::apply()
-{
-    IOptionWidget::apply();
-}
-
-void GeneralOptionWidget::cancel()
-{
-    IOptionWidget::cancel();
-}
-
-void GeneralOptionWidget::finish()
-{
-    IOptionWidget::finish();
-}
 
 
 // ~======================

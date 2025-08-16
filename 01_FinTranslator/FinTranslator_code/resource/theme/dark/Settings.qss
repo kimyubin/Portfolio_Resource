@@ -83,3 +83,13 @@
   color:rgb(240, 240, 232)
 }
 
+
+
+/* IOptionWidget */
+#SettingsWidget IOptionWidget > QWidget > QWidget> QWidget,
+#SettingsWidget IOptionWidget > QWidget > QWidget,
+#SettingsWidget IOptionWidget > QWidget,
+#SettingsWidget IOptionWidget
+{
+  background-color: transparent;
+}

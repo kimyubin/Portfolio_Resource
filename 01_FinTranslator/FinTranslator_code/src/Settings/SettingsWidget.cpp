@@ -37,7 +37,7 @@ SettingsWidget::SettingsWidget(QWidget* parent)
     resize(640, 600);
 
     setLayout(ui->mainLayout);
-    ui->mainLayout->setContentsMargins(0, 16, 26, 0);
+    ui->mainLayout->setContentsMargins(0, 16, 0, 0);
     ui->mainLayout->setHorizontalSpacing(24);
     ui->mainLayout->setVerticalSpacing(16);
 
@@ -88,12 +88,15 @@ SettingsWidget::SettingsWidget(QWidget* parent)
 
 SettingsWidget::~SettingsWidget()
 {
-    const std::unordered_set<IOptionPage*>& options = IOptionPage::allOptionsPages();
-    for (IOptionPage* option : options)
+    const QSet<QPointer<IOptionPage>>& options = IOptionPage::allOptionsPages();
+    for (const QPointer<IOptionPage>& option : options)
     {
-        option->finish();
+        if (option)
+        {
+            option->finish();
+        }
     }
-    
+
     delete ui;
 }
 

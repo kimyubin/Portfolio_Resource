@@ -3,6 +3,8 @@
 #include "EngineOptionWidget.h"
 
 #include <QString>
+#include <QDoubleSpinBox>
+#include <QGroupBox>
 
 #include <qsortfilterproxymodel.h>
 #include <qstringlistmodel.h>
@@ -14,13 +16,21 @@
 
 #include "ui_EngineOptionWidget.h"
 
+#include "SubWidgets/SettingCard.h"
+
 EngineOptionWidget::EngineOptionWidget(QWidget* parent)
     : IOptionWidget(parent)
     , ui(new Ui::EngineOptionWidget)
 {
-    ui->setupUi(this);
-    setLayout(ui->mainLayout);
+    setObjectName("EngineOptionWidget");
 
+    auto [engineGroup, engineVLay] = addNewOptionGroupBox(tr("번역 엔진 설정"));
+
+    {
+        ui->setupUi(engineGroup);
+        engineVLay->addWidget(ui->gridLayoutWidget, 0, Qt::AlignmentFlag::AlignTop);
+    }
+    
 
     ui->enginSelectCombo->setEditable(false);
 
@@ -71,6 +81,33 @@ EngineOptionWidget::EngineOptionWidget(QWidget* parent)
 
 
     ui->enginSelectCombo->setCurrentIndex(static_cast<int>(finConfig.getCurrentEngineType()));
+
+
+    // AI 옵션
+    auto [aiOptionGroup, aiOptionVLay] = addNewOptionGroupBox(tr("AI 옵션"));
+
+    // 온도 설정
+    {
+        SettingCard* openAiTemper = new SettingCard(new QDoubleSpinBox(this), aiOptionGroup);
+        openAiTemper->setHeader(tr("OpenAI 온도 설정"));
+        openAiTemper->setDescription(tr("(기본값: 0.5)"));
+
+        // openAiTemper->setDescription(tr("값이 0에 가까울수록 고정된 답을 냅니다. 클수록 창의적이지만 부정확한 번역을 제공합니다."));
+        QDoubleSpinBox* spinBox = openAiTemper->getContent<QDoubleSpinBox>();
+        spinBox->setRange(0.0, 1.5);
+        spinBox->setDecimals(2);
+        spinBox->setSingleStep(0.1);
+        spinBox->setValue(finConfig.getOpenAI_Temperature());
+        connect(spinBox, &QDoubleSpinBox::valueChanged, this, [](const double inTemper)
+        {
+            finConfig.setOpenAI_Temperature(inTemper);
+        });
+
+
+        aiOptionVLay->addWidget(openAiTemper, 0, Qt::AlignmentFlag::AlignTop);
+    }
+
+    initializeAfterCtor();
 }
 
 EngineOptionWidget::~EngineOptionWidget()
@@ -78,20 +115,10 @@ EngineOptionWidget::~EngineOptionWidget()
     delete ui;
 }
 
-void EngineOptionWidget::apply()
+void EngineOptionWidget::setEngineGroupUI()
 {
-    IOptionWidget::apply();
 }
 
-void EngineOptionWidget::cancel()
-{
-    IOptionWidget::cancel();
-}
-
-void EngineOptionWidget::finish()
-{
-    IOptionWidget::finish();
-}
 
 
 // ~======================

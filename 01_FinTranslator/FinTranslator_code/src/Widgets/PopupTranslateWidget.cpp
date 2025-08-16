@@ -43,6 +43,11 @@ const QString codeBgColorStr = QString::fromLatin1("rgba(%1,%2,%3,%4)")
 
 PopupTranslateWidget::PopupTranslateWidget(QWidget* parent)
     : ITranslateWidget(parent, Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint)
+    , _minSizeRatio(0.15, 0.15)
+    , _maxSizeRatio(0.2, 0.65)
+    , _fullSizeRatio(0.95, 0.95)
+    , _centerPosRatio(0.85, 0.33)
+    , _yPosMaxRatio((1.0 - _maxSizeRatio.height()) / 2.0)
     , ui(new Ui::PopupTranslateWidget)
 {
     QIcon icon = QIcon(":/img/icon_img");
@@ -62,7 +67,15 @@ PopupTranslateWidget::PopupTranslateWidget(QWidget* parent)
     // 포커스 변경에 따른 그림자 on/off 제어. (그림자 성능)
     connect(qApp, &QApplication::focusChanged, this, &PopupTranslateWidget::detectFocusInOut);
 
-    changePopupMode();
+    if (finConfig.getIsPopupTrWindowTemp())
+    {
+        changePopupMode();
+    }
+    else
+    {
+        changeNormalWindowMode();
+    }
+
 
     // ~======================
     // 애니메이션
@@ -257,11 +270,8 @@ void PopupTranslateWidget::setTextEditSize(const QSize& inTextEditSize)
     adjustSize();
 
     // 생성될 스크린 위치 추적
-    QPointF screenTopLeft  = QPointF();
     QScreen* currentScreen = nullptr;
-
-    const Fin::ScreenPopupPolicy screenPolicy = finConfig.getSimplePopupScreenPolicy();
-    switch (screenPolicy)
+    switch (finConfig.getSimplePopupScreenPolicy())
     {
     case Fin::ScreenPopupPolicy::Default:
     case Fin::ScreenPopupPolicy::PrimaryScreen:
@@ -277,11 +287,11 @@ void PopupTranslateWidget::setTextEditSize(const QSize& inTextEditSize)
         break;
     }
 
-    screenTopLeft = currentScreen ? currentScreen->geometry().topLeft() : QPointF();
+    const QPointF screenTopLeft = currentScreen ? currentScreen->geometry().topLeft() : QPointF();
 
     // position
     const QSizeF screenSize   = currentScreen ? currentScreen->size().toSizeF() : QSizeF(1920, 1080);
-    const QPoint targetCenter = screenTopLeft.toPoint() + QPoint(screenSize.width() * _centerPosRatio.x(), screenSize.height() * _centerPosRatio.y());
+    const QPoint targetCenter = screenTopLeft.toPoint() + QPointF(screenSize.width() * _centerPosRatio.x(), screenSize.height() * _centerPosRatio.y()).toPoint();
     const QPoint recCenter    = rect().center();
 
     QPoint targetPos = targetCenter - recCenter;
@@ -608,7 +618,7 @@ void PopupTranslateWidget::calculateTextEditLayoutInfo()
             + QMargins(0, ui->titleLayout->sizeHint().height(), 0, 0)  // 상단 타이틀바 레이아웃 높이
             + QMargins(0, ui->loadingLayout->sizeHint().height(), 0, 0)// 상단 로딩바 레이아웃 높이
             + QMargins(0, 0, 0, ui->statusLayout->sizeHint().height()) // 하단 상태표시 레이아웃 높이
-            + QMargins(0, 0, ui->outerVScrollBar->width(), 0);         // 우측 외부 스크롤바
+            + QMargins(0, 0, ui->outerVScrollBar->width(), 0);         // 우측 외부 스크롤바 ->sizeHint().width();로 대체 고려해야함
 
     _outMargins = ui->outerLayout->contentsMargins();
 
